@@ -3,6 +3,7 @@ package http_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,7 +12,7 @@ import (
 )
 
 func TestCreateProductHandler_Valid(t *testing.T) {
-	// t.Skip("Skipping this test because it conflicts with the get products test until the product removal feature is implemented to clean up the products after each test.")
+	t.Cleanup(clearAllProducts)
 	r := httpdelivery.NewRouter()
 	body := map[string]any{"name": "Laptop", "price": 1500.0}
 	jsonBody, _ := json.Marshal(body)
@@ -36,6 +37,7 @@ func TestCreateProductHandler_Valid(t *testing.T) {
 }
 
 func TestCreateProductHandler_Invalid(t *testing.T) {
+	t.Cleanup(clearAllProducts)
 	r := httpdelivery.NewRouter()
 
 	tests := []struct {
@@ -91,6 +93,7 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 }
 
 func TestCreateProductHandler_MalformedJSON(t *testing.T) {
+	t.Cleanup(clearAllProducts)
 	r := httpdelivery.NewRouter()
 	badJSON := `{"name": "Invalid" "price": 100}` // missing comma
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewBufferString(badJSON))
@@ -109,6 +112,7 @@ func TestCreateProductHandler_MalformedJSON(t *testing.T) {
 }
 
 func TestGetProductsHandler(t *testing.T) {
+	t.Cleanup(clearAllProducts)
 	r := httpdelivery.NewRouter()
 
 	// Create products to ensure we have something to retrieve
@@ -117,18 +121,17 @@ func TestGetProductsHandler(t *testing.T) {
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody))
 	createW := httptest.NewRecorder()
 	r.ServeHTTP(createW, createReq)
-
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for product creation, got %d", createW.Code)
+	}
 	// Create a second product
 	createBody2 := map[string]any{"name": "Tablet", "price": 499.99}
 	jsonCreateBody2, _ := json.Marshal(createBody2)
 	createReq2 := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody2))
 	createW2 := httptest.NewRecorder()
 	r.ServeHTTP(createW2, createReq2)
-	if createW2.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK for second product creation, got %d", createW2.Code)
-	}
-	if createW.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK for product creation, got %d", createW.Code)
+	if createW2.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for second product creation, got %d", createW2.Code)
 	}
 
 	// Now retrieve the products
@@ -165,5 +168,26 @@ func TestGetProductsHandler(t *testing.T) {
 		if products[1]["price"] != 499.99 {
 			t.Errorf("expected product price 499.99, got %v", products[1]["price"])
 		}
+	}
+}
+
+// clearAllProducts removes all products using the HTTP API endpoints.
+func clearAllProducts() {
+	r := httpdelivery.NewRouter()
+	getReq := httptest.NewRequest(http.MethodGet, "/products", nil)
+	getW := httptest.NewRecorder()
+	r.ServeHTTP(getW, getReq)
+	if getW.Code != http.StatusOK {
+		return // nothing to clear or error
+	}
+	var products []map[string]any
+	if err := json.NewDecoder(getW.Body).Decode(&products); err != nil {
+		return
+	}
+	for _, p := range products {
+		id := fmt.Sprintf("%v", p["id"])
+		deleteReq := httptest.NewRequest(http.MethodDelete, "/products/"+id, nil)
+		deleteW := httptest.NewRecorder()
+		r.ServeHTTP(deleteW, deleteReq)
 	}
 }

@@ -3,20 +3,26 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"github.com/go-chi/chi/v5"
+	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
 type ProductRequest struct {
+	Id    int     `json:"id,omitempty"`
 	Name  string  `json:"name"`
 	Price float64 `json:"price"`
 }
 
 type ProductResponse struct {
+	Id    int     `json:"id"`
 	Name  string  `json:"name"`
 	Price float64 `json:"price"`
 }
 
-var products []ProductResponse
+var productRepo repo.ProductRepository = repo.NewInMemoryProductRepository()
 
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	var req ProductRequest
@@ -34,17 +40,65 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	product := ProductResponse(req)
-	products = append(products, product)
+	product := repo.Product{
+		Name:  req.Name,
+		Price: req.Price,
+	}
+	created, err := productRepo.Create(product)
+	if err != nil {
+		http.Error(w, "could not create product", http.StatusInternalServerError)
+		return
+	}
+
+	resp := ProductResponse{
+		Id:    created.ID,
+		Name:  created.Name,
+		Price: created.Price,
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated) // 🎯 The important change!
-	json.NewEncoder(w).Encode(product)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
+	products, err := productRepo.GetAll()
+	if err != nil {
+		http.Error(w, "could not fetch products", http.StatusInternalServerError)
+		return
+	}
+	responses := make([]ProductResponse, len(products))
+	for i, p := range products {
+		responses[i] = ProductResponse{
+			Id:    p.ID,
+			Name:  p.Name,
+			Price: p.Price,
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(products)
+	json.NewEncoder(w).Encode(responses)
+}
+
+func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id") // Use chi to get the path parameter
+	if idStr == "" {
+		http.Error(w, "product ID is required", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid product ID", http.StatusBadRequest)
+		return
+	}
+	if err := productRepo.Delete(id); err != nil {
+		if err == repo.ErrProductNotFound {
+			http.Error(w, "product not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "could not delete product", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func validateProduct(p ProductRequest) map[string]string {

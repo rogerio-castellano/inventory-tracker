@@ -10,5 +10,6 @@ func NewRouter() http.Handler {
 	r := chi.NewRouter()
 	r.Post("/products", CreateProductHandler)
 	r.Get("/products", GetProductsHandler)
+	r.Delete("/products/{id}", DeleteProductHandler)
 	return r
 }
