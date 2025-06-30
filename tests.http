@@ -1,0 +1,11 @@
+@url=http://localhost:8080
+
+POST {{url}}/products HTTP/1.1
+Content-Type: application/json
+
+{
+    "name": "Book",
+    "price": 1.23
+}
+
+###
