@@ -11,6 +11,13 @@ type ProductRequest struct {
 	Price float64 `json:"price"`
 }
 
+type ProductResponse struct {
+	Name  string  `json:"name"`
+	Price float64 `json:"price"`
+}
+
+var products []ProductResponse
+
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	var req ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -27,11 +34,16 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	product := ProductResponse{Name: req.Name, Price: req.Price}
+	products = append(products, product)
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"name":  req.Name,
-		"price": req.Price,
-	})
+	json.NewEncoder(w).Encode(product)
+}
+
+func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(products)
 }
 
 func validateProduct(p ProductRequest) map[string]string {

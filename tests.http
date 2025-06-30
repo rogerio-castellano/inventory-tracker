@@ -11,3 +11,4 @@ Content-Type: application/json
 
 ###
 
+GET {{url}}/products HTTP/1.1
