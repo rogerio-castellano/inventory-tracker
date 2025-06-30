@@ -1,5 +1,6 @@
 @url=http://localhost:8080
 
+# Valid product creation
 POST {{url}}/products HTTP/1.1
 Content-Type: application/json
 
@@ -9,3 +10,4 @@ Content-Type: application/json
 }
 
 ###
+
