@@ -11,7 +11,7 @@ import (
 )
 
 func TestCreateProductHandler_Valid(t *testing.T) {
-	t.Skip("Skipping this test because it conflicts with the get products test until the product removal feature is implemented to clean up the products after each test.")
+	// t.Skip("Skipping this test because it conflicts with the get products test until the product removal feature is implemented to clean up the products after each test.")
 	r := httpdelivery.NewRouter()
 	body := map[string]any{"name": "Laptop", "price": 1500.0}
 	jsonBody, _ := json.Marshal(body)
@@ -19,8 +19,8 @@ func TestCreateProductHandler_Valid(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK, got %d", w.Code)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d", w.Code)
 	}
 
 	var resp map[string]any

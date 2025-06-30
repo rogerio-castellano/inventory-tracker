@@ -34,10 +34,11 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	product := ProductResponse{Name: req.Name, Price: req.Price}
+	product := ProductResponse(req)
 	products = append(products, product)
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated) // 🎯 The important change!
 	json.NewEncoder(w).Encode(product)
 }
 
