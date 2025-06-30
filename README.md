@@ -1,3 +1,1 @@
-#
-
-Inventory Tracker API
+# Inventory Tracker API
