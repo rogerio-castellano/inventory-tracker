@@ -88,3 +88,21 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateProductHandler_MalformedJSON(t *testing.T) {
+	r := httpdelivery.NewRouter()
+	badJSON := `{"name": "Invalid" "price": 100}` // missing comma
+	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewBufferString(badJSON))
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 Bad Request, got %d", w.Code)
+	}
+
+	expectedBody := "invalid input\n"
+	if w.Body.String() != expectedBody {
+		t.Errorf("expected response body %q, got %q", expectedBody, w.Body.String())
+	}
+}
