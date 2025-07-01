@@ -22,8 +22,6 @@ type ProductResponse struct {
 	Price float64 `json:"price"`
 }
 
-var productRepo repo.ProductRepository = repo.NewInMemoryProductRepository()
-
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	var req ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
