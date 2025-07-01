@@ -14,6 +14,9 @@ Content-Type: application/json
 GET {{url}}/products HTTP/1.1
 
 ###
-#		deleteReq := httptest.NewRequest(http.MethodDelete, "/products/"+id, nil)
+
+GET {{url}}/products/1 HTTP/1.1
+
+###
 
 DELETE {{url}}/products/1 HTTP/1.1

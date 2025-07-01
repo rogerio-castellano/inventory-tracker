@@ -77,6 +77,31 @@ func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(responses)
 }
 
+func GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid product ID", http.StatusBadRequest)
+		return
+	}
+
+	product, err := productRepo.GetByID(id)
+	if err != nil {
+		if err == repo.ErrProductNotFound {
+			http.Error(w, "product not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "could not fetch product", http.StatusInternalServerError)
+		return
+	}
+	resp := ProductResponse{
+		Id:    product.ID,
+		Name:  product.Name,
+		Price: product.Price,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
 func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id") // Use chi to get the path parameter
 	if idStr == "" {
