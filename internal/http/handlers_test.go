@@ -12,6 +12,8 @@ import (
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
+var testCreatedProductIDs []int
+
 func init() {
 	setupTestRepo()
 }
@@ -21,7 +23,7 @@ func setupTestRepo() {
 }
 
 func TestCreateProductHandler_Valid(t *testing.T) {
-	t.Cleanup(clearAllProducts)
+	t.Cleanup(cleanupCreatedProducts)
 	r := httpdelivery.NewRouter()
 	body := map[string]any{"name": "Laptop", "price": 1500.0}
 	jsonBody, _ := json.Marshal(body)
@@ -37,6 +39,10 @@ func TestCreateProductHandler_Valid(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
+
+	// Store the created product ID for cleanup
+	testCreatedProductIDs = append(testCreatedProductIDs, int(resp["id"].(float64)))
+
 	if resp["name"] != "Laptop" {
 		t.Errorf("expected name 'Laptop', got %v", resp["name"])
 	}
@@ -46,7 +52,7 @@ func TestCreateProductHandler_Valid(t *testing.T) {
 }
 
 func TestCreateProductHandler_Invalid(t *testing.T) {
-	t.Cleanup(clearAllProducts)
+	t.Cleanup(cleanupCreatedProducts)
 	r := httpdelivery.NewRouter()
 
 	tests := []struct {
@@ -102,7 +108,7 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 }
 
 func TestCreateProductHandler_MalformedJSON(t *testing.T) {
-	t.Cleanup(clearAllProducts)
+	t.Cleanup(cleanupCreatedProducts)
 	r := httpdelivery.NewRouter()
 	badJSON := `{"name": "Invalid" "price": 100}` // missing comma
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewBufferString(badJSON))
@@ -121,7 +127,7 @@ func TestCreateProductHandler_MalformedJSON(t *testing.T) {
 }
 
 func TestGetProductsHandler(t *testing.T) {
-	t.Cleanup(clearAllProducts)
+	t.Cleanup(cleanupCreatedProducts)
 	r := httpdelivery.NewRouter()
 
 	// Create products to ensure we have something to retrieve
@@ -180,23 +186,13 @@ func TestGetProductsHandler(t *testing.T) {
 	}
 }
 
-// clearAllProducts removes all products using the HTTP API endpoints.
-func clearAllProducts() {
+// cleanupCreatedProducts deletes all products created during tests.
+func cleanupCreatedProducts() {
 	r := httpdelivery.NewRouter()
-	getReq := httptest.NewRequest(http.MethodGet, "/products", nil)
-	getW := httptest.NewRecorder()
-	r.ServeHTTP(getW, getReq)
-	if getW.Code != http.StatusOK {
-		return // nothing to clear or error
-	}
-	var products []map[string]any
-	if err := json.NewDecoder(getW.Body).Decode(&products); err != nil {
-		return
-	}
-	for _, p := range products {
-		id := fmt.Sprintf("%v", p["id"])
-		deleteReq := httptest.NewRequest(http.MethodDelete, "/products/"+id, nil)
+	for _, id := range testCreatedProductIDs {
+		deleteReq := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/products/%d", id), nil)
 		deleteW := httptest.NewRecorder()
 		r.ServeHTTP(deleteW, deleteReq)
 	}
+	testCreatedProductIDs = nil // reset after cleanup
 }
