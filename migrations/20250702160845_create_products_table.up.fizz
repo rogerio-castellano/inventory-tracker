@@ -1,0 +1,6 @@
+create_table("products") {
+  t.Column("id", "integer", {primary: true})
+  t.Column("name", "text", {})
+  t.Column("price", "decimal", {"precision": 10, "scale": 2})
+  t.Check("price_check", "price > 0")
+}

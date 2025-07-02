@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
@@ -39,8 +40,10 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	product := repo.Product{
-		Name:  req.Name,
-		Price: req.Price,
+		Name:      req.Name,
+		Price:     req.Price,
+		CreatedAt: time.Now().Format(time.RFC3339),
+		UpdatedAt: time.Now().Format(time.RFC3339),
 	}
 	created, err := productRepo.Create(product)
 	if err != nil {
@@ -148,9 +151,10 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	product := repo.Product{
-		ID:    id,
-		Name:  req.Name,
-		Price: req.Price,
+		ID:        id,
+		Name:      req.Name,
+		Price:     req.Price,
+		UpdatedAt: time.Now().Format(time.RFC3339),
 	}
 	updated, err := productRepo.Update(product)
 	if err != nil {
