@@ -186,6 +186,123 @@ func TestGetProductsHandler(t *testing.T) {
 	}
 }
 
+func TestUpdateProductHandler_Valid(t *testing.T) {
+	t.Cleanup(cleanupCreatedProducts)
+	r := httpdelivery.NewRouter()
+
+	// First, create a product
+	createBody := map[string]any{"name": "Old Name", "price": 100.0}
+	jsonCreateBody, _ := json.Marshal(createBody)
+	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody))
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d", createW.Code)
+	}
+
+	var created map[string]any
+	if err := json.NewDecoder(createW.Body).Decode(&created); err != nil {
+		t.Fatalf("error decoding create response: %v", err)
+	}
+	id := int(created["id"].(float64))
+
+	// Store the created product ID for cleanup
+	testCreatedProductIDs = append(testCreatedProductIDs, id)
+
+	// Now update the product
+	updateBody := map[string]any{"name": "New Name", "price": 200.0}
+	jsonUpdateBody, _ := json.Marshal(updateBody)
+	updateReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", id), bytes.NewReader(jsonUpdateBody))
+	updateW := httptest.NewRecorder()
+	r.ServeHTTP(updateW, updateReq)
+
+	if updateW.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", updateW.Code)
+	}
+
+	var updated map[string]any
+	if err := json.NewDecoder(updateW.Body).Decode(&updated); err != nil {
+		t.Fatalf("error decoding update response: %v", err)
+	}
+
+	if updated["name"] != "New Name" {
+		t.Errorf("expected name 'New Name', got %v", updated["name"])
+	}
+	if updated["price"] != 200.0 {
+		t.Errorf("expected price 200.0, got %v", updated["price"])
+	}
+}
+
+func TestUpdateProductHandler_NotFound(t *testing.T) {
+	r := httpdelivery.NewRouter()
+	updateBody := map[string]any{"name": "Ghost", "price": 1.0}
+	jsonBody, _ := json.Marshal(updateBody)
+	req := httptest.NewRequest(http.MethodPut, "/products/999999", bytes.NewReader(jsonBody))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found, got %d", w.Code)
+	}
+}
+
+func TestUpdateProductHandler_InvalidInput(t *testing.T) {
+	r := httpdelivery.NewRouter()
+	invalidJSON := `{"name": "Bad" "price": 999}` // missing comma
+	req := httptest.NewRequest(http.MethodPut, "/products/1", bytes.NewBufferString(invalidJSON))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request, got %d", w.Code)
+	}
+}
+
+func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
+	t.Cleanup(cleanupCreatedProducts)
+	r := httpdelivery.NewRouter()
+
+	// Create valid product
+	createBody := map[string]any{"name": "Temporary", "price": 100.0}
+	jsonCreateBody, _ := json.Marshal(createBody)
+	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody))
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d", createW.Code)
+	}
+	var created map[string]any
+	json.NewDecoder(createW.Body).Decode(&created)
+	id := int(created["id"].(float64))
+
+	// Store the created product ID for cleanup
+	testCreatedProductIDs = append(testCreatedProductIDs, id)
+
+	// Try invalid update
+	invalidUpdate := map[string]any{"name": "", "price": -100}
+	jsonInvalid, _ := json.Marshal(invalidUpdate)
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", id), bytes.NewReader(jsonInvalid))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request, got %d", w.Code)
+	}
+
+	var resp map[string]map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("error decoding response: %v", err)
+	}
+	errorsMap := resp["errors"]
+	if _, ok := errorsMap["name"]; !ok {
+		t.Errorf("expected validation error for 'name'")
+	}
+	if _, ok := errorsMap["price"]; !ok {
+		t.Errorf("expected validation error for 'price'")
+	}
+}
+
 // cleanupCreatedProducts deletes all products created during tests.
 func cleanupCreatedProducts() {
 	r := httpdelivery.NewRouter()
