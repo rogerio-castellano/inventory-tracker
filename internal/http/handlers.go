@@ -124,6 +124,53 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid product ID", http.StatusBadRequest)
+		return
+	}
+
+	var req ProductRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid input", http.StatusBadRequest)
+		return
+	}
+
+	validationErrors := validateProduct(req)
+	if len(validationErrors) > 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"errors": validationErrors,
+		})
+		return
+	}
+
+	product := repo.Product{
+		ID:    id,
+		Name:  req.Name,
+		Price: req.Price,
+	}
+	updated, err := productRepo.Update(product)
+	if err != nil {
+		if err == repo.ErrProductNotFound {
+			http.Error(w, "product not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "could not update product", http.StatusInternalServerError)
+		return
+	}
+
+	resp := ProductResponse{
+		Id:    updated.ID,
+		Name:  updated.Name,
+		Price: updated.Price,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 func validateProduct(p ProductRequest) map[string]string {
 	errs := make(map[string]string)
 	if strings.TrimSpace(p.Name) == "" {
