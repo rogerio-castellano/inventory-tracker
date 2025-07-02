@@ -9,7 +9,16 @@ import (
 	"testing"
 
 	httpdelivery "github.com/rogerio-castellano/inventory-tracker/internal/http"
+	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
+
+func init() {
+	setupTestRepo()
+}
+
+func setupTestRepo() {
+	httpdelivery.SetProductRepo(repo.NewInMemoryProductRepository())
+}
 
 func TestCreateProductHandler_Valid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
