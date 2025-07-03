@@ -401,6 +401,24 @@ func TestFilterProductsHandler(t *testing.T) {
 			t.Errorf("expected empty result, got %d items", len(resp))
 		}
 	})
+
+	t.Run("Pagination limit and offset", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/products/filter?&offset=0&limit=2", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+		var resp []httpdelivery.ProductResponse
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("error decoding response: %v", err)
+		}
+		if len(resp) != 2 {
+			t.Errorf("expected 2 products, got %d", len(resp))
+		}
+	})
+
 }
 
 // clearAllProducts removes all products using the HTTP API endpoints.

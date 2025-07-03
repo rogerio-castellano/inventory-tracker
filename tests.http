@@ -36,3 +36,6 @@ Content-Type: application/json
 
 ### Filter products
 GET {{url}}/products/filter?name=o&minQty=2&maxQty=4&minPrice=1&maxPrice=4.44 HTTP/1.1
+
+###
+GET {{url}}/products/filter?offset=1&limit=2 HTTP/1.1

@@ -94,7 +94,7 @@ func (r *PostgresProductRepository) Delete(id int) error {
 	return nil
 }
 
-func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty *int) ([]models.Product, error) {
+func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, error) {
 	query := `SELECT id, name, price, quantity FROM products WHERE 1=1`
 	args := []any{}
 	argIdx := 1
@@ -126,6 +126,17 @@ func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *floa
 	}
 
 	query += " ORDER BY id"
+
+	if limit != nil && *limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", argIdx)
+		args = append(args, limit)
+		argIdx++
+	}
+	if offset != nil && *offset > 0 {
+		query += fmt.Sprintf(" OFFSET $%d", argIdx)
+		args = append(args, offset)
+		argIdx++
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

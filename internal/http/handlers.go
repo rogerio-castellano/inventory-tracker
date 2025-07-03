@@ -191,8 +191,8 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 	name := query.Get("name")
 
 	var (
-		minPrice, maxPrice *float64
-		minQty, maxQty     *int
+		minPrice, maxPrice            *float64
+		minQty, maxQty, offset, limit *int
 	)
 
 	if v := query.Get("minPrice"); v != "" {
@@ -216,7 +216,37 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	products, err := productRepo.Filter(name, minPrice, maxPrice, minQty, maxQty)
+	if v := query.Get("offset"); v != "" {
+		if val, err := strconv.Atoi(v); err == nil {
+			offset = &val
+		}
+	}
+
+	if v := query.Get("limit"); v != "" {
+		if val, err := strconv.Atoi(v); err == nil {
+			limit = &val
+		}
+	}
+
+	if v := query.Get("limit"); v != "" {
+		if val, err := strconv.Atoi(v); err != nil || val <= 0 {
+			http.Error(w, "invalid limit", http.StatusBadRequest)
+			return
+		} else {
+			limit = &val
+		}
+	}
+
+	if v := query.Get("offset"); v != "" {
+		if val, err := strconv.Atoi(v); err != nil || val < 0 {
+			http.Error(w, "invalid offset", http.StatusBadRequest)
+			return
+		} else {
+			offset = &val
+		}
+	}
+
+	products, err := productRepo.Filter(name, minPrice, maxPrice, minQty, maxQty, offset, limit)
 	if err != nil {
 		http.Error(w, "could not filter products", http.StatusInternalServerError)
 		return

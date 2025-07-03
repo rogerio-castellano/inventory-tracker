@@ -14,10 +14,17 @@ type InMemoryProductRepository struct {
 }
 
 // Filter implements ProductRepository.
-func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty *int) ([]models.Product, error) {
+func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, error) {
 	var filtered []models.Product
 
-	for _, p := range r.products {
+	for i, p := range r.products {
+		if offset != nil && i < *offset {
+			continue
+		}
+		if limit != nil && len(filtered) == *limit {
+			break
+		}
+
 		if name != "" && !strings.Contains(strings.ToLower(p.Name), strings.ToLower(name)) {
 			continue
 		}
@@ -33,7 +40,6 @@ func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *floa
 		if maxQty != nil && p.Quantity > *maxQty {
 			continue
 		}
-
 		filtered = append(filtered, p)
 	}
 
