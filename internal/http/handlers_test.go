@@ -437,6 +437,92 @@ func TestFilterProductsHandler(t *testing.T) {
 	})
 }
 
+func TestAdjustQuantityHandler(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := httpdelivery.NewRouter()
+
+	// Create a product
+	create := map[string]any{"name": "InventoryItem", "price": 10.0, "quantity": 10}
+	body, _ := json.Marshal(create)
+	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("failed to create product")
+	}
+	var created map[string]any
+	json.NewDecoder(w.Body).Decode(&created)
+	id := int(created["id"].(float64))
+
+	t.Run("Increase quantity", func(t *testing.T) {
+		adj := map[string]int{"delta": 5}
+		body, _ := json.Marshal(adj)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+		var resp map[string]any
+		json.NewDecoder(w.Body).Decode(&resp)
+		if resp["quantity"] != 15.0 {
+			t.Errorf("expected quantity 15, got %v", resp["quantity"])
+		}
+	})
+
+	t.Run("Decrease quantity", func(t *testing.T) {
+		adj := map[string]int{"delta": -3}
+		body, _ := json.Marshal(adj)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+		var resp map[string]any
+		json.NewDecoder(w.Body).Decode(&resp)
+		if resp["quantity"] != 12.0 {
+			t.Errorf("expected quantity 12, got %v", resp["quantity"])
+		}
+	})
+
+	t.Run("Too much decrease (underflow)", func(t *testing.T) {
+		adj := map[string]int{"delta": -100}
+		body, _ := json.Marshal(adj)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusConflict {
+			t.Fatalf("expected 409 Conflict, got %d", w.Code)
+		}
+	})
+
+	t.Run("Invalid ID", func(t *testing.T) {
+		adj := map[string]int{"delta": 1}
+		body, _ := json.Marshal(adj)
+		req := httptest.NewRequest(http.MethodPost, "/products/abc/adjust", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+
+	t.Run("Invalid JSON", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewBufferString(`{`))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+}
+
 // clearAllProducts removes all products using the HTTP API endpoints.
 func clearAllProducts() {
 	r := httpdelivery.NewRouter()

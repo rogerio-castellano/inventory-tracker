@@ -39,3 +39,37 @@ GET {{url}}/products/filter?name=o&minQty=2&maxQty=4&minPrice=1&maxPrice=4.44 HT
 
 ###
 GET {{url}}/products/filter?offset=1&limit=2 HTTP/1.1
+
+
+### Adjust quantity
+POST {{url}}/products/4/adjust HTTP/1.1
+Content-Type: application/json
+
+{
+    "delta": 2
+}
+
+### 
+POST {{url}}/products/4/adjust HTTP/1.1
+Content-Type: application/json
+
+{
+    "delta": -2
+}
+
+###
+POST {{url}}/products/4/adjust HTTP/1.1
+Content-Type: application/json
+
+{
+    "delta": -100
+}
+
+### 
+POST {{url}}/products/1000/adjust HTTP/1.1
+Content-Type: application/json
+
+{
+    "delta": -2
+}
+

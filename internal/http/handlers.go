@@ -31,6 +31,10 @@ type ProductFilterResponse struct {
 	TotalCount int               `json:"total_count"`
 }
 
+type QuantityAdjustmentRequest struct {
+	Delta int `json:"delta"` // can be positive or negative
+}
+
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	var req ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -271,6 +275,55 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid product ID", http.StatusBadRequest)
+		return
+	}
+
+	var req QuantityAdjustmentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid input", http.StatusBadRequest)
+		return
+	}
+
+	product, err := productRepo.GetByID(id)
+	if err != nil {
+		if err == repo.ErrProductNotFound {
+			http.Error(w, "product not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to fetch product", http.StatusInternalServerError)
+		return
+	}
+
+	newQty := product.Quantity + req.Delta
+	if newQty < 0 {
+		http.Error(w, "quantity cannot be negative", http.StatusConflict)
+		return
+	}
+
+	product.Quantity = newQty
+	product.UpdatedAt = time.Now().Format(time.RFC3339)
+
+	updated, err := productRepo.Update(product)
+	if err != nil {
+		http.Error(w, "could not update product", http.StatusInternalServerError)
+		return
+	}
+
+	resp := ProductResponse{
+		Id:       updated.ID,
+		Name:     updated.Name,
+		Price:    updated.Price,
+		Quantity: updated.Quantity,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func validateProduct(p ProductRequest) map[string]string {
