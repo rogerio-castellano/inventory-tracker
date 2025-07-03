@@ -193,5 +193,8 @@ func validateProduct(p ProductRequest) map[string]string {
 	if p.Price <= 0 {
 		errs["price"] = "Price must be greater than zero"
 	}
+	if p.Quantity < 0 {
+		errs["quantity"] = "Quantity cannot be negative"
+	}
 	return errs
 }
