@@ -94,37 +94,23 @@ func (r *PostgresProductRepository) Delete(id int) error {
 	return nil
 }
 
-func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, error) {
+func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, int, error) {
+
+	conditions, args, argIdx := filterConditions(name, minPrice, maxPrice, minQty, maxQty)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var totalCount int
+	filterClause := conditions
+	countQuery := "SELECT COUNT(*) FROM products WHERE 1=1" + filterClause
+	row := r.db.QueryRowContext(ctx, countQuery, args...)
+	if err := row.Scan(&totalCount); err != nil {
+		return nil, 0, err
+	}
+
 	query := `SELECT id, name, price, quantity FROM products WHERE 1=1`
-	args := []any{}
-	argIdx := 1
-
-	if name != "" {
-		query += fmt.Sprintf(" AND name ILIKE $%d", argIdx)
-		args = append(args, "%"+name+"%")
-		argIdx++
-	}
-	if minPrice != nil {
-		query += fmt.Sprintf(" AND price >= $%d", argIdx)
-		args = append(args, *minPrice)
-		argIdx++
-	}
-	if maxPrice != nil {
-		query += fmt.Sprintf(" AND price <= $%d", argIdx)
-		args = append(args, *maxPrice)
-		argIdx++
-	}
-	if minQty != nil {
-		query += fmt.Sprintf(" AND quantity >= $%d", argIdx)
-		args = append(args, *minQty)
-		argIdx++
-	}
-	if maxQty != nil {
-		query += fmt.Sprintf(" AND quantity <= $%d", argIdx)
-		args = append(args, *maxQty)
-		argIdx++
-	}
-
+	query += conditions
 	query += " ORDER BY id"
 
 	if limit != nil && *limit > 0 {
@@ -138,12 +124,9 @@ func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *floa
 		argIdx++
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -151,9 +134,44 @@ func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *floa
 	for rows.Next() {
 		var p models.Product
 		if err := rows.Scan(&p.ID, &p.Name, &p.Price, &p.Quantity); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		products = append(products, p)
 	}
-	return products, nil
+
+	return products, totalCount, nil
+}
+
+func filterConditions(name string, minPrice, maxPrice *float64, minQty, maxQty *int) (string, []any, int) {
+	query := ""
+	argIdx := 1
+	args := []any{}
+
+	if name != "" {
+		query += fmt.Sprintf(" AND name ILIKE $%d", argIdx)
+		args = append(args, "%"+name+"%")
+		argIdx++
+	}
+	if minPrice != nil {
+		query += fmt.Sprintf(" AND price >= $%d", argIdx)
+		args = append(args, minPrice)
+		argIdx++
+	}
+	if maxPrice != nil {
+		query += fmt.Sprintf(" AND price <= $%d", argIdx)
+		args = append(args, maxPrice)
+		argIdx++
+	}
+	if minQty != nil {
+		query += fmt.Sprintf(" AND quantity >= $%d", argIdx)
+		args = append(args, minQty)
+		argIdx++
+	}
+	if maxQty != nil {
+		query += fmt.Sprintf(" AND quantity <= $%d", argIdx)
+		args = append(args, maxQty)
+		argIdx++
+	}
+
+	return query, args, argIdx
 }

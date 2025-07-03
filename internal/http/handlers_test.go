@@ -344,10 +344,10 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp []httpdelivery.ProductResponse
+		var resp httpdelivery.ProductFilterResponse
 		json.NewDecoder(w.Body).Decode(&resp)
-		if len(resp) != 1 || !strings.Contains(strings.ToLower(resp[0].Name), "phone") {
-			t.Errorf("expected one product containing 'phone', got %v", resp)
+		if len(resp.Products) != 1 || !strings.Contains(strings.ToLower(resp.Products[0].Name), "phone") {
+			t.Errorf("expected one product containing 'phone', got %v", resp.Products)
 		}
 	})
 
@@ -359,9 +359,9 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp []httpdelivery.ProductResponse
+		var resp httpdelivery.ProductFilterResponse
 		json.NewDecoder(w.Body).Decode(&resp)
-		for _, p := range resp {
+		for _, p := range resp.Products {
 			price := p.Price
 			if price < 100 || price > 1000 {
 				t.Errorf("product price out of range: %v", price)
@@ -377,9 +377,9 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp []httpdelivery.ProductResponse
+		var resp httpdelivery.ProductFilterResponse
 		json.NewDecoder(w.Body).Decode(&resp)
-		for _, p := range resp {
+		for _, p := range resp.Products {
 			qty := p.Quantity
 			if qty < 5 || qty > 20 {
 				t.Errorf("quantity out of range: %v", qty)
@@ -395,10 +395,10 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp []httpdelivery.ProductResponse
+		var resp httpdelivery.ProductFilterResponse
 		json.NewDecoder(w.Body).Decode(&resp)
-		if len(resp) != 0 {
-			t.Errorf("expected empty result, got %d items", len(resp))
+		if got := len(resp.Products); got != 0 {
+			t.Errorf("expected empty result, got %d items", got)
 		}
 	})
 
@@ -410,15 +410,31 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp []httpdelivery.ProductResponse
+		var resp httpdelivery.ProductFilterResponse
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}
-		if len(resp) != 2 {
-			t.Errorf("expected 2 products, got %d", len(resp))
+		if got := len(resp.Products); got != 2 {
+			t.Errorf("expected 2 products, got %d", got)
 		}
 	})
 
+	t.Run("Pagination with no products", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/products/filter?&offset=999&limit=10", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+		var resp httpdelivery.ProductFilterResponse
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("error decoding response: %v", err)
+		}
+		if got := len(resp.Products); got != 0 {
+			t.Errorf("expected empty result, got %d items", got)
+		}
+	})
 }
 
 // clearAllProducts removes all products using the HTTP API endpoints.

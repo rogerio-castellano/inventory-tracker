@@ -14,17 +14,10 @@ type InMemoryProductRepository struct {
 }
 
 // Filter implements ProductRepository.
-func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, error) {
+func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, int, error) {
 	var filtered []models.Product
 
-	for i, p := range r.products {
-		if offset != nil && i < *offset {
-			continue
-		}
-		if limit != nil && len(filtered) == *limit {
-			break
-		}
-
+	for _, p := range r.products {
 		if name != "" && !strings.Contains(strings.ToLower(p.Name), strings.ToLower(name)) {
 			continue
 		}
@@ -43,7 +36,22 @@ func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *floa
 		filtered = append(filtered, p)
 	}
 
-	return filtered, nil
+	if offset != nil && *offset > len(filtered) {
+		return nil, 0, nil // If offset is greater than the number of filtered products, return empty slice
+	}
+
+	start := 0
+	end := len(filtered)
+	if (offset != nil && *offset > 0) || (limit != nil && *limit > 0) {
+		if offset != nil && *offset < len(filtered) {
+			start = *offset
+		}
+		if limit != nil && *limit > 0 && start+*limit < len(filtered) {
+			end = start + *limit
+		}
+	}
+
+	return filtered[start:end], len(filtered), nil
 }
 
 // NewInMemoryProductRepository creates a new instance of InMemoryProductRepository.

@@ -26,6 +26,11 @@ type ProductResponse struct {
 	Quantity int     `json:"quantity"`
 }
 
+type ProductFilterResponse struct {
+	Products   []ProductResponse `json:"products"`
+	TotalCount int               `json:"total_count"`
+}
+
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	var req ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -246,23 +251,26 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	products, err := productRepo.Filter(name, minPrice, maxPrice, minQty, maxQty, offset, limit)
+	products, totalCount, err := productRepo.Filter(name, minPrice, maxPrice, minQty, maxQty, offset, limit)
 	if err != nil {
 		http.Error(w, "could not filter products", http.StatusInternalServerError)
 		return
 	}
 
-	var responses []ProductResponse
+	var response ProductFilterResponse
 	for _, p := range products {
-		responses = append(responses, ProductResponse{
+		response.Products = append(response.Products, ProductResponse{
 			Id:       p.ID,
 			Name:     p.Name,
 			Price:    p.Price,
 			Quantity: p.Quantity,
 		})
 	}
+
+	response.TotalCount = totalCount
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(responses)
+	json.NewEncoder(w).Encode(response)
 }
 
 func validateProduct(p ProductRequest) map[string]string {
