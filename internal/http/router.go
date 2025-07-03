@@ -13,5 +13,6 @@ func NewRouter() http.Handler {
 	r.Get("/products/{id}", GetProductByIDHandler)
 	r.Delete("/products/{id}", DeleteProductHandler)
 	r.Put("/products/{id}", UpdateProductHandler)
+	r.Get("/products/filter", FilterProductsHandler)
 	return r
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	models "github.com/rogerio-castellano/inventory-tracker/internal/models"
@@ -91,4 +92,57 @@ func (r *PostgresProductRepository) Delete(id int) error {
 		return ErrProductNotFound
 	}
 	return nil
+}
+
+func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice, minQty, maxQty *float64) ([]models.Product, error) {
+	query := `SELECT id, name, price, quantity FROM products WHERE 1=1`
+	args := []any{}
+	argIdx := 1
+
+	if name != "" {
+		query += fmt.Sprintf(" AND name ILIKE $%d", argIdx)
+		args = append(args, "%"+name+"%")
+		argIdx++
+	}
+	if minPrice != nil {
+		query += fmt.Sprintf(" AND price >= $%d", argIdx)
+		args = append(args, *minPrice)
+		argIdx++
+	}
+	if maxPrice != nil {
+		query += fmt.Sprintf(" AND price <= $%d", argIdx)
+		args = append(args, *maxPrice)
+		argIdx++
+	}
+	if minQty != nil {
+		query += fmt.Sprintf(" AND quantity >= $%d", argIdx)
+		args = append(args, *minQty)
+		argIdx++
+	}
+	if maxQty != nil {
+		query += fmt.Sprintf(" AND quantity <= $%d", argIdx)
+		args = append(args, *maxQty)
+		argIdx++
+	}
+
+	query += " ORDER BY id"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var products []models.Product
+	for rows.Next() {
+		var p models.Product
+		if err := rows.Scan(&p.ID, &p.Name, &p.Price, &p.Quantity); err != nil {
+			return nil, err
+		}
+		products = append(products, p)
+	}
+	return products, nil
 }

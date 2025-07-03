@@ -198,3 +198,52 @@ func validateProduct(p ProductRequest) map[string]string {
 	}
 	return errs
 }
+
+func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	name := query.Get("name")
+
+	var (
+		minPrice, maxPrice, minQty, maxQty *float64
+	)
+
+	if v := query.Get("minPrice"); v != "" {
+		if val, err := strconv.ParseFloat(v, 64); err == nil {
+			minPrice = &val
+		}
+	}
+	if v := query.Get("maxPrice"); v != "" {
+		if val, err := strconv.ParseFloat(v, 64); err == nil {
+			maxPrice = &val
+		}
+	}
+	if v := query.Get("minQty"); v != "" {
+		if val, err := strconv.ParseFloat(v, 64); err == nil {
+			minQty = &val
+		}
+	}
+	if v := query.Get("maxQty"); v != "" {
+		if val, err := strconv.ParseFloat(v, 64); err == nil {
+			maxQty = &val
+		}
+	}
+
+	products, err := productRepo.Filter(name, minPrice, maxPrice, minQty, maxQty)
+	if err != nil {
+		http.Error(w, "could not filter products", http.StatusInternalServerError)
+		return
+	}
+
+	var responses []ProductResponse
+	for _, p := range products {
+		responses = append(responses, ProductResponse{
+			Id:       p.ID,
+			Name:     p.Name,
+			Price:    p.Price,
+			Quantity: p.Quantity,
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(responses)
+}
