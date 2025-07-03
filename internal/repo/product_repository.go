@@ -1,10 +1,12 @@
 package repo
 
+import "github.com/rogerio-castellano/inventory-tracker/internal/models"
+
 // ProductRepository defines the interface for product data operations.
 type ProductRepository interface {
-	Create(product Product) (Product, error)
-	GetAll() ([]Product, error)
-	GetByID(id int) (Product, error)
-	Update(product Product) (Product, error)
+	Create(product models.Product) (models.Product, error)
+	GetAll() ([]models.Product, error)
+	GetByID(id int) (models.Product, error)
+	Update(product models.Product) (models.Product, error)
 	Delete(id int) error
 }

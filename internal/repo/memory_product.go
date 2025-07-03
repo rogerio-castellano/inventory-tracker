@@ -1,32 +1,27 @@
 package repo
 
-import "errors"
+import (
+	"errors"
 
-// Product represents a product entity in the inventory system.
-type Product struct {
-	ID        int     `json:"id"`
-	Name      string  `json:"name"`
-	Price     float64 `json:"price"`
-	CreatedAt string  `json:"created_at,omitempty"`
-	UpdatedAt string  `json:"updated_at,omitempty"`
-}
+	"github.com/rogerio-castellano/inventory-tracker/internal/models"
+)
 
 // InMemoryProductRepository is an in-memory implementation of ProductRepository.
 type InMemoryProductRepository struct {
-	products []Product
+	products []models.Product
 	nextID   int
 }
 
 // NewInMemoryProductRepository creates a new instance of InMemoryProductRepository.
 func NewInMemoryProductRepository() *InMemoryProductRepository {
 	return &InMemoryProductRepository{
-		products: []Product{},
+		products: []models.Product{},
 		nextID:   1,
 	}
 }
 
 // Create adds a new product to the repository.
-func (r *InMemoryProductRepository) Create(product Product) (Product, error) {
+func (r *InMemoryProductRepository) Create(product models.Product) (models.Product, error) {
 	product.ID = r.nextID
 	r.nextID++
 	r.products = append(r.products, product)
@@ -34,29 +29,29 @@ func (r *InMemoryProductRepository) Create(product Product) (Product, error) {
 }
 
 // GetAll retrieves all products from the repository.
-func (r *InMemoryProductRepository) GetAll() ([]Product, error) {
+func (r *InMemoryProductRepository) GetAll() ([]models.Product, error) {
 	return r.products, nil
 }
 
 // GetByID retrieves a product by its ID.
-func (r *InMemoryProductRepository) GetByID(id int) (Product, error) {
+func (r *InMemoryProductRepository) GetByID(id int) (models.Product, error) {
 	for _, p := range r.products {
 		if p.ID == id {
 			return p, nil
 		}
 	}
-	return Product{}, ErrProductNotFound
+	return models.Product{}, ErrProductNotFound
 }
 
 // Update modifies an existing product in the repository.
-func (r *InMemoryProductRepository) Update(product Product) (Product, error) {
+func (r *InMemoryProductRepository) Update(product models.Product) (models.Product, error) {
 	for i, p := range r.products {
 		if p.ID == product.ID {
 			r.products[i] = product
 			return product, nil
 		}
 	}
-	return Product{}, ErrProductNotFound
+	return models.Product{}, ErrProductNotFound
 }
 
 // Delete removes a product from the repository by its ID.
