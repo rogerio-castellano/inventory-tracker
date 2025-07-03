@@ -6,7 +6,8 @@ Content-Type: application/json
 
 {
     "name": "Book",
-    "price": 1.23
+    "price": 1.23,
+    "quantity": 1
 }
 
 ###
@@ -29,5 +30,6 @@ Content-Type: application/json
 {
     "id" : 2,
     "name": "Go",
-    "price": 4.44
+    "price": 4.44,
+    "quantity": 4
 }

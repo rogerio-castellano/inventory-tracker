@@ -13,15 +13,17 @@ import (
 )
 
 type ProductRequest struct {
-	Id    int     `json:"id,omitempty"`
-	Name  string  `json:"name"`
-	Price float64 `json:"price"`
+	Id       int     `json:"id,omitempty"`
+	Name     string  `json:"name"`
+	Price    float64 `json:"price"`
+	Quantity int     `json:"quantity"`
 }
 
 type ProductResponse struct {
-	Id    int     `json:"id"`
-	Name  string  `json:"name"`
-	Price float64 `json:"price"`
+	Id       int     `json:"id"`
+	Name     string  `json:"name"`
+	Price    float64 `json:"price"`
+	Quantity int     `json:"quantity"`
 }
 
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +45,7 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	product := models.Product{
 		Name:      req.Name,
 		Price:     req.Price,
+		Quantity:  req.Quantity,
 		CreatedAt: time.Now().Format(time.RFC3339),
 		UpdatedAt: time.Now().Format(time.RFC3339),
 	}
@@ -53,9 +56,10 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ProductResponse{
-		Id:    created.ID,
-		Name:  created.Name,
-		Price: created.Price,
+		Id:       created.ID,
+		Name:     created.Name,
+		Price:    created.Price,
+		Quantity: created.Quantity,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -72,9 +76,10 @@ func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
 	responses := make([]ProductResponse, len(products))
 	for i, p := range products {
 		responses[i] = ProductResponse{
-			Id:    p.ID,
-			Name:  p.Name,
-			Price: p.Price,
+			Id:       p.ID,
+			Name:     p.Name,
+			Price:    p.Price,
+			Quantity: p.Quantity,
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -99,13 +104,15 @@ func GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := ProductResponse{
-		Id:    product.ID,
-		Name:  product.Name,
-		Price: product.Price,
+		Id:       product.ID,
+		Name:     product.Name,
+		Price:    product.Price,
+		Quantity: product.Quantity,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
+
 func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id") // Use chi to get the path parameter
 	if idStr == "" {
@@ -155,6 +162,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		ID:        id,
 		Name:      req.Name,
 		Price:     req.Price,
+		Quantity:  req.Quantity,
 		UpdatedAt: time.Now().Format(time.RFC3339),
 	}
 	updated, err := productRepo.Update(product)
@@ -168,9 +176,10 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ProductResponse{
-		Id:    updated.ID,
-		Name:  updated.Name,
-		Price: updated.Price,
+		Id:       updated.ID,
+		Name:     updated.Name,
+		Price:    updated.Price,
+		Quantity: updated.Quantity,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
