@@ -185,27 +185,14 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func validateProduct(p ProductRequest) map[string]string {
-	errs := make(map[string]string)
-	if strings.TrimSpace(p.Name) == "" {
-		errs["name"] = "Name is required"
-	}
-	if p.Price <= 0 {
-		errs["price"] = "Price must be greater than zero"
-	}
-	if p.Quantity < 0 {
-		errs["quantity"] = "Quantity cannot be negative"
-	}
-	return errs
-}
-
 func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
 	name := query.Get("name")
 
 	var (
-		minPrice, maxPrice, minQty, maxQty *float64
+		minPrice, maxPrice *float64
+		minQty, maxQty     *int
 	)
 
 	if v := query.Get("minPrice"); v != "" {
@@ -219,12 +206,12 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if v := query.Get("minQty"); v != "" {
-		if val, err := strconv.ParseFloat(v, 64); err == nil {
+		if val, err := strconv.Atoi(v); err == nil {
 			minQty = &val
 		}
 	}
 	if v := query.Get("maxQty"); v != "" {
-		if val, err := strconv.ParseFloat(v, 64); err == nil {
+		if val, err := strconv.Atoi(v); err == nil {
 			maxQty = &val
 		}
 	}
@@ -246,4 +233,18 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(responses)
+}
+
+func validateProduct(p ProductRequest) map[string]string {
+	errs := make(map[string]string)
+	if strings.TrimSpace(p.Name) == "" {
+		errs["name"] = "Name is required"
+	}
+	if p.Price <= 0 {
+		errs["price"] = "Price must be greater than zero"
+	}
+	if p.Quantity < 0 {
+		errs["quantity"] = "Quantity cannot be negative"
+	}
+	return errs
 }

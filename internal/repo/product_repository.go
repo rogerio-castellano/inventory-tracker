@@ -9,5 +9,5 @@ type ProductRepository interface {
 	GetByID(id int) (models.Product, error)
 	Update(product models.Product) (models.Product, error)
 	Delete(id int) error
-	Filter(name string, minPrice, maxPrice, minQty, maxQtd *float64) ([]models.Product, error)
+	Filter(name string, minPrice, maxPrice *float64, minQty, maxQty *int) ([]models.Product, error)
 }

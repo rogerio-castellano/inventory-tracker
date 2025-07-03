@@ -33,3 +33,6 @@ Content-Type: application/json
     "price": 4.44,
     "quantity": 4
 }
+
+### Filter products
+GET {{url}}/products/filter?name=o&minQty=2&maxQty=4&minPrice=1&maxPrice=4.44 HTTP/1.1

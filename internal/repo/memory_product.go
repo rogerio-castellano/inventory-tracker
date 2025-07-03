@@ -2,6 +2,7 @@ package repo
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 )
@@ -10,6 +11,33 @@ import (
 type InMemoryProductRepository struct {
 	products []models.Product
 	nextID   int
+}
+
+// Filter implements ProductRepository.
+func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty *int) ([]models.Product, error) {
+	var filtered []models.Product
+
+	for _, p := range r.products {
+		if name != "" && !strings.Contains(strings.ToLower(p.Name), strings.ToLower(name)) {
+			continue
+		}
+		if minPrice != nil && p.Price < *minPrice {
+			continue
+		}
+		if maxPrice != nil && p.Price > *maxPrice {
+			continue
+		}
+		if minQty != nil && p.Quantity < *minQty {
+			continue
+		}
+		if maxQty != nil && p.Quantity > *maxQty {
+			continue
+		}
+
+		filtered = append(filtered, p)
+	}
+
+	return filtered, nil
 }
 
 // NewInMemoryProductRepository creates a new instance of InMemoryProductRepository.

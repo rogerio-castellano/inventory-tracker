@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	httpdelivery "github.com/rogerio-castellano/inventory-tracker/internal/http"
@@ -149,6 +150,14 @@ func TestGetProductsHandler(t *testing.T) {
 	if createW.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created for product creation, got %d", createW.Code)
 	}
+
+	// Store the created product ID for cleanup
+	var resp httpdelivery.ProductResponse
+	if err := json.NewDecoder(createW.Body).Decode(&resp); err != nil {
+		t.Fatalf("error decoding response: %v", err)
+	}
+	testCreatedProductIDs = append(testCreatedProductIDs, resp.Id)
+
 	// Create a second product
 	createBody2 := httpdelivery.ProductRequest{Name: "Tablet", Price: 499.99, Quantity: 2}
 	jsonCreateBody2, _ := json.Marshal(createBody2)
@@ -158,6 +167,12 @@ func TestGetProductsHandler(t *testing.T) {
 	if createW2.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created for second product creation, got %d", createW2.Code)
 	}
+
+	// Store the created product ID for cleanup
+	if err := json.NewDecoder(createW2.Body).Decode(&resp); err != nil {
+		t.Fatalf("error decoding response: %v", err)
+	}
+	testCreatedProductIDs = append(testCreatedProductIDs, resp.Id)
 
 	// Now retrieve the products
 	getReq := httptest.NewRequest(http.MethodGet, "/products", nil)
@@ -321,6 +336,95 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 	if _, ok := errorsMap["quantity"]; !ok {
 		t.Errorf("expected validation error for 'quantity'")
 	}
+}
+
+func TestFilterProductsHandler(t *testing.T) {
+	t.Cleanup(cleanupCreatedProducts)
+	r := httpdelivery.NewRouter()
+
+	// Seed test data
+	products := []httpdelivery.ProductRequest{
+		{Name: "Phone", Price: 699.99, Quantity: 10},
+		{Name: "Laptop", Price: 1299.99, Quantity: 5},
+		{Name: "Mouse", Price: 29.99, Quantity: 50},
+		{Name: "Monitor", Price: 199.99, Quantity: 20},
+	}
+
+	for _, p := range products {
+		body, _ := json.Marshal(p)
+		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("failed to create test product: %v", p.Name)
+		}
+	}
+
+	t.Run("Filter by name", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/products/filter?name=phone", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+		var resp []httpdelivery.ProductResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		if len(resp) != 1 || !strings.Contains(strings.ToLower(resp[0].Name), "phone") {
+			t.Errorf("expected one product containing 'phone', got %v", resp)
+		}
+	})
+
+	t.Run("Filter by price range", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/products/filter?minPrice=100&maxPrice=1000", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+		var resp []httpdelivery.ProductResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		for _, p := range resp {
+			price := p.Price
+			if price < 100 || price > 1000 {
+				t.Errorf("product price out of range: %v", price)
+			}
+		}
+	})
+
+	t.Run("Filter by quantity", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/products/filter?minQty=5&maxQty=20", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+		var resp []httpdelivery.ProductResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		for _, p := range resp {
+			qty := p.Quantity
+			if qty < 5 || qty > 20 {
+				t.Errorf("quantity out of range: %v", qty)
+			}
+		}
+	})
+
+	t.Run("Filter with no match", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/products/filter?name=xyz", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+		var resp []httpdelivery.ProductResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		if len(resp) != 0 {
+			t.Errorf("expected empty result, got %d items", len(resp))
+		}
+	})
 }
 
 // cleanupCreatedProducts deletes all products created during tests.

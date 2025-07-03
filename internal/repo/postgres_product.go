@@ -94,7 +94,7 @@ func (r *PostgresProductRepository) Delete(id int) error {
 	return nil
 }
 
-func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice, minQty, maxQty *float64) ([]models.Product, error) {
+func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty *int) ([]models.Product, error) {
 	query := `SELECT id, name, price, quantity FROM products WHERE 1=1`
 	args := []any{}
 	argIdx := 1
