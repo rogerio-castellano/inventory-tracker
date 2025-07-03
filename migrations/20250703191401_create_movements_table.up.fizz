@@ -1,0 +1,11 @@
+create_table("movements") {
+  t.Column("id", "integer", {primary: true})
+  t.Column("product_id", "integer", {})
+  t.Column("delta", "integer", {})
+  t.Check("delta_check", "delta <> 0")
+}
+
+add_foreign_key("movements", "product_id", {"products": ["id"]}, {
+    "on_delete": "cascade",
+    "on_update": "cascade",
+})

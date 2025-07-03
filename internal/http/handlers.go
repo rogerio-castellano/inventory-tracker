@@ -316,6 +316,12 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = movementRepo.Log(id, req.Delta)
+	if err != nil {
+		http.Error(w, "could not log movement", http.StatusInternalServerError)
+		return
+	}
+
 	resp := ProductResponse{
 		Id:       updated.ID,
 		Name:     updated.Name,
