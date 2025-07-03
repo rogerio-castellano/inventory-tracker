@@ -334,6 +334,25 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid product ID", http.StatusBadRequest)
+		return
+	}
+
+	movements, err := movementRepo.GetByProductID(id)
+	if err != nil {
+		log.Printf("could not retrieve movements for product %d: %v", id, err)
+		http.Error(w, "could not retrieve movements", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(movements)
+}
+
 func validateProduct(p ProductRequest) map[string]string {
 	errs := make(map[string]string)
 	if strings.TrimSpace(p.Name) == "" {

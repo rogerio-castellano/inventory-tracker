@@ -28,7 +28,7 @@ func (r *PostgresMovementRepository) Log(productID, delta int) error {
 
 // GetByProductID returns all movements for a specific product
 func (r *PostgresMovementRepository) GetByProductID(productID int) ([]models.Movement, error) {
-	query := `SELECT id, product_id, delta, timestamp FROM movements WHERE product_id = $1 ORDER BY timestamp DESC`
+	query := `SELECT id, product_id, delta, created_at FROM movements WHERE product_id = $1 ORDER BY created_at DESC`
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -41,7 +41,7 @@ func (r *PostgresMovementRepository) GetByProductID(productID int) ([]models.Mov
 	var movements []models.Movement
 	for rows.Next() {
 		var m models.Movement
-		if err := rows.Scan(&m.ID, &m.ProductID, &m.Delta, &m.Timestamp); err != nil {
+		if err := rows.Scan(&m.ID, &m.ProductID, &m.Delta, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		movements = append(movements, m)
