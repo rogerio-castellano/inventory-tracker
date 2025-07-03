@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -318,8 +319,9 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = movementRepo.Log(id, req.Delta)
 	if err != nil {
-		http.Error(w, "could not log movement", http.StatusInternalServerError)
-		return
+		// Log the error but do not return it to the user
+		// This allows the product update to succeed even if logging fails
+		log.Printf("could not log movement for product %d, delta %d: %v", id, req.Delta, err)
 	}
 
 	resp := ProductResponse{
