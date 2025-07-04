@@ -791,14 +791,13 @@ func TestExportMovementsHandler(t *testing.T) {
 	if createW.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created map[string]any
+	var created httpdelivery.ProductResponse
 	json.NewDecoder(createW.Body).Decode(&created)
-	id := int(created["id"].(float64))
 
 	// Add 1 movement
 	adj := httpdelivery.QuantityAdjustmentRequest{Delta: 3}
 	body, _ := json.Marshal(adj)
-	adjReq := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(body))
+	adjReq := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 	adjW := httptest.NewRecorder()
 	r.ServeHTTP(adjW, adjReq)
 	if adjW.Code != http.StatusOK {
@@ -806,7 +805,7 @@ func TestExportMovementsHandler(t *testing.T) {
 	}
 
 	t.Run("Export as JSON", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=json", id), nil)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=json", created.Id), nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
@@ -819,7 +818,7 @@ func TestExportMovementsHandler(t *testing.T) {
 	})
 
 	t.Run("Export as CSV", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=csv", id), nil)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=csv", created.Id), nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
@@ -832,7 +831,7 @@ func TestExportMovementsHandler(t *testing.T) {
 	})
 
 	t.Run("Invalid format", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=pdf", id), nil)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=pdf", created.Id), nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
@@ -848,6 +847,70 @@ func TestExportMovementsHandler(t *testing.T) {
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+}
+
+func TestExportMovementsHandler_Filtered(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := httpdelivery.NewRouter()
+
+	// Create a product
+	create := httpdelivery.ProductRequest{Name: "FilteredExport", Price: 75.0, Quantity: 8}
+	jsonCreate, _ := json.Marshal(create)
+	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreate))
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("failed to create product")
+	}
+	var created httpdelivery.ProductResponse
+	json.NewDecoder(createW.Body).Decode(&created)
+
+	// Insert one old movement
+	movementRepo.AddMovement(created.Id, -1, time.Now().Add(-72*time.Hour).UTC())
+
+	// Insert one recent movement via API
+	adj := httpdelivery.QuantityAdjustmentRequest{Delta: 2}
+	body, _ := json.Marshal(adj)
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("failed to add recent movement")
+	}
+
+	t.Run("Export recent only as JSON", func(t *testing.T) {
+		since := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=json&since=%s", created.Id, since), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+		var items []map[string]any
+		if err := json.NewDecoder(w.Body).Decode(&items); err != nil {
+			t.Fatalf("failed to decode json: %v", err)
+		}
+		if count := len(items); count != 1 {
+			t.Errorf("expected 1 recent movement, got %d", count)
+		}
+	})
+
+	t.Run("Export old only as CSV", func(t *testing.T) {
+		until := time.Now().Add(-48 * time.Hour).Format(time.RFC3339)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=csv&until=%s", created.Id, until), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+		body := w.Body.String()
+		lines := strings.Split(strings.TrimSpace(body), "\n")
+		if count := len(lines); count-1 != 1 {
+			t.Errorf("expected 1 CSV row of data, got %d rows (incl. header)", count-1)
 		}
 	})
 }

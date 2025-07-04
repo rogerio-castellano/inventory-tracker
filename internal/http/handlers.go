@@ -491,7 +491,29 @@ func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	movements, _, err := movementRepo.GetByProductID(id, nil, nil, nil, nil)
+	sinceStr := r.URL.Query().Get("since")
+	untilStr := r.URL.Query().Get("until")
+
+	if len(sinceStr) == len(time.RFC3339) && sinceStr[len(sinceStr)-6] == ' ' {
+		sinceStr = sinceStr[:len(sinceStr)-6] + "+" + sinceStr[len(sinceStr)-5:]
+	}
+	if len(untilStr) == len(time.RFC3339) && untilStr[len(untilStr)-6] == ' ' {
+		untilStr = untilStr[:len(untilStr)-6] + "+" + untilStr[len(untilStr)-5:]
+	}
+
+	var since, until *time.Time
+	if sinceStr != "" {
+		if ts, err := time.Parse(time.RFC3339, sinceStr); err == nil {
+			since = &ts
+		}
+	}
+	if untilStr != "" {
+		if ts, err := time.Parse(time.RFC3339, untilStr); err == nil {
+			until = &ts
+		}
+	}
+
+	movements, _, err := movementRepo.GetByProductID(id, since, until, nil, nil)
 	if err != nil {
 		http.Error(w, "could not retrieve movements", http.StatusInternalServerError)
 		return
