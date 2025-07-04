@@ -590,14 +590,14 @@ func TestGetMovementsHandler(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		if w.Code != http.StatusOK {
-			t.Errorf("expected 200 OK (empty list), got %d", w.Code)
+		if w.Code != http.StatusNotFound {
+			t.Errorf("expected 400 Not Found, got %d", w.Code)
 		}
 
-		var movements []httpdelivery.MovementResponse
+		var movements httpdelivery.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&movements)
-		if len(movements) != 0 {
-			t.Errorf("expected 0 movements, got %d", len(movements))
+		if count := movements.Meta.TotalCount; count != 0 {
+			t.Errorf("expected 0 movements, got %d", count)
 		}
 	})
 }

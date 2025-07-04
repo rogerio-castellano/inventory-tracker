@@ -52,6 +52,7 @@ func (r *PostgresMovementRepository) GetByProductID(productID int, since, until 
 	}
 
 	query += " ORDER BY created_at DESC"
+
 	if limit != nil && *limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", idx)
 		args = append(args, limit)
@@ -72,6 +73,32 @@ func (r *PostgresMovementRepository) GetByProductID(productID int, since, until 
 		return nil, 0, err
 	}
 
+	// If no movements, return early
+	if total == 0 {
+		return []models.Movement{}, 0, nil
+	}
+
+	// If limit is zero, return early with empty data
+	// This is to handle cases where we want to count but not fetch any rows
+	if limit != nil && *limit == 0 {
+		return []models.Movement{}, total, nil
+	}
+
+	// If the offset is greater than the total, return only metadata with no movements
+	// This is to handle pagination where the offset exceeds available data
+	if offset != nil && *offset >= total {
+		return []models.Movement{}, total, nil
+	}
+
+	defaultLimit := 3 // Default limit if none provided
+
+	// If no limit is provided or if the limit exceeds the default, apply the default limit
+	if limit == nil || *limit > defaultLimit {
+		query += fmt.Sprintf(" LIMIT $%d", idx)
+		args = append(args, defaultLimit)
+	}
+
+	// Fetch movements
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err

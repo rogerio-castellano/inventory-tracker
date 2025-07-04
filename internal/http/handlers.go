@@ -358,33 +358,83 @@ func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate the product ID
+	_, err = productRepo.GetByID(id)
+	if err != nil {
+		if err == repo.ErrProductNotFound {
+			http.Error(w, "product not found", http.StatusNotFound)
+			return
+		}
+	}
+
+	sinceStr := r.URL.Query().Get("since")
+	untilStr := r.URL.Query().Get("until")
+
 	// Reverse the substitution from + for space in the date parameters, otherwise
 	// time.Parse will fail with an error.
 	// This is necessary because URL query parameters replace + with a space.
 	// Example: 2025-07-03T17:44:03+02:00 becomes 2025-07-03T17:44:03 02:00 on r.URL.Query().Get()
-	sinceStr := strings.ReplaceAll(r.URL.Query().Get("since"), " ", "+")
-	untilStr := strings.ReplaceAll(r.URL.Query().Get("until"), " ", "+")
+	if len(sinceStr) == len(time.RFC3339) && sinceStr[len(sinceStr)-6] == ' ' {
+		sinceStr = sinceStr[:len(sinceStr)-6] + "+" + sinceStr[len(sinceStr)-5:]
+	}
+	if len(untilStr) == len(time.RFC3339) && untilStr[len(untilStr)-6] == ' ' {
+		untilStr = untilStr[:len(untilStr)-6] + "+" + untilStr[len(untilStr)-5:]
+	}
 
 	var since, until *time.Time
 	if sinceStr != "" {
 		if ts, err := time.Parse(time.RFC3339, sinceStr); err == nil {
 			since = &ts
+		} else {
+			log.Printf("could not parse since date %s: %v", sinceStr, err)
+			http.Error(w, "invalid since date format", http.StatusBadRequest)
+			return
 		}
 	}
 	if untilStr != "" {
 		if ts, err := time.Parse(time.RFC3339, untilStr); err == nil {
 			until = &ts
+		} else {
+			log.Printf("could not parse until date %s: %v", untilStr, err)
+			http.Error(w, "invalid until date format", http.StatusBadRequest)
+			return
 		}
 	}
 
-	limitStr := r.URL.Query().Get("limit")
-	offsetStr := r.URL.Query().Get("offset")
 	var limit, offset *int
-	if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
-		limit = &v
+
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr != "" {
+		if v, err := strconv.Atoi(limitStr); err == nil {
+			limit = &v
+		} else {
+			log.Printf("could not parse limit %s: %v", limitStr, err)
+			http.Error(w, "invalid limit format", http.StatusBadRequest)
+			return
+		}
 	}
-	if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
-		offset = &v
+
+	if limit != nil && *limit <= 0 {
+		log.Printf("invalid limit %d, must be greater than zero", *limit)
+		http.Error(w, "limit must be greater than zero", http.StatusBadRequest)
+		return
+	}
+
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr != "" {
+		if v, err := strconv.Atoi(offsetStr); err == nil {
+			offset = &v
+		} else {
+			log.Printf("could not parse offset %s: %v", offsetStr, err)
+			http.Error(w, "invalid offset format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if offset != nil && *offset < 0 {
+		log.Printf("invalid offset %d, must be zero or positive", *offset)
+		http.Error(w, "offset must be zero or positive", http.StatusBadRequest)
+		return
 	}
 
 	movements, total, err := movementRepo.GetByProductID(id, since, until, limit, offset)
