@@ -1,8 +1,19 @@
 @url=http://localhost:8080
 
+# Login with valid credentials
+POST {{url}}/login HTTP/1.1
+Content-Type: application/json
+
+{
+    "username": "admin",
+    "password": "secret"
+}
+
+###
 # Valid product creation
 POST {{url}}/products HTTP/1.1
 Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE2NTI0MDUsInN1YiI6MSwidXNlcm5hbWUiOiJhZG1pbiJ9.iGa8TsQ7Q4NQ7WgNXm7THjzAKODQQLp8W2G0bstL8-I
 
 {
     "name": "Book",
@@ -11,15 +22,12 @@ Content-Type: application/json
 }
 
 ###
-
 GET {{url}}/products HTTP/1.1
 
 ###
-
 GET {{url}}/products/1 HTTP/1.1
 
 ###
-
 DELETE {{url}}/products/3 HTTP/1.1
 
 ###
