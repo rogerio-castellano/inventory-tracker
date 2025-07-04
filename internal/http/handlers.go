@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	models "github.com/rogerio-castellano/inventory-tracker/internal/models"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
@@ -541,4 +542,30 @@ func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		csvWriter.Flush()
 	}
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	var creds struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		http.Error(w, "invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// 🚨 Replace with real user validation
+	if creds.Username != "admin" || creds.Password != "secret" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := auth.GenerateToken(1, creds.Username)
+	if err != nil {
+		http.Error(w, "could not generate token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"token": token})
 }

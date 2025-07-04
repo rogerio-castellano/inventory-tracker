@@ -915,6 +915,68 @@ func TestExportMovementsHandler_Filtered(t *testing.T) {
 	})
 }
 
+func TestAuthFlow(t *testing.T) {
+	r := httpdelivery.NewRouter()
+
+	t.Run("Login with valid credentials", func(t *testing.T) {
+		payload := map[string]string{"username": "admin", "password": "secret"}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+
+		var resp map[string]string
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode token response: %v", err)
+		}
+		if resp["token"] == "" {
+			t.Error("expected token in response")
+		}
+	})
+
+	t.Run("Protected route without token is rejected", func(t *testing.T) {
+		product := map[string]any{"name": "AuthBox", "price": 999.0, "quantity": 1}
+		b, _ := json.Marshal(product)
+		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401 Unauthorized, got %d", w.Code)
+		}
+	})
+
+	t.Run("Protected route with valid token succeeds", func(t *testing.T) {
+		// login to get token
+		payload := map[string]string{"username": "admin", "password": "secret"}
+		body, _ := json.Marshal(payload)
+		loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+		loginW := httptest.NewRecorder()
+		r.ServeHTTP(loginW, loginReq)
+
+		var resp map[string]string
+		_ = json.NewDecoder(loginW.Body).Decode(&resp)
+		token := resp["token"]
+
+		// make authorized request
+		product := map[string]any{"name": "SecureProduct", "price": 10.0, "quantity": 2}
+		b, _ := json.Marshal(product)
+		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d", w.Code)
+		}
+	})
+}
+
 // clearAllProducts removes all products using the HTTP API endpoints.
 func clearAllProducts() {
 	r := httpdelivery.NewRouter()
