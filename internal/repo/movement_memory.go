@@ -37,17 +37,33 @@ func (r *InMemoryMovementRepository) Log(productID, delta int) error {
 	return nil
 }
 
-// GetByProductID returns all movements for a specific product
-func (r *InMemoryMovementRepository) GetByProductID(productID int, since, until *time.Time, limit, offset int) ([]models.Movement, int, error) {
-	var movements []models.Movement
+// GetByProductID returns all movements for a specific product, optionally filtered by date range and paginated
+func (r *InMemoryMovementRepository) GetByProductID(productID int, since, until *time.Time, limit, offset *int) ([]models.Movement, int, error) {
+	var filtered []models.Movement
 	for _, m := range r.movements {
 		if m.ProductID == productID {
 			if (since != nil && m.CreatedAt < since.Format(time.RFC3339)) ||
 				(until != nil && m.CreatedAt > until.Format(time.RFC3339)) {
 				continue
 			}
-			movements = append(movements, m)
+			filtered = append(filtered, m)
 		}
 	}
-	return movements, 0, nil
+
+	if offset != nil && *offset > len(filtered) {
+		return nil, 0, nil // If offset is greater than the number of filtered products, return empty slice
+	}
+
+	start := 0
+	end := len(filtered)
+	if (offset != nil && *offset > 0) || (limit != nil && *limit > 0) {
+		if offset != nil && *offset < len(filtered) {
+			start = *offset
+		}
+		if limit != nil && *limit > 0 && start+*limit < len(filtered) {
+			end = start + *limit
+		}
+	}
+
+	return filtered[start:end], len(filtered), nil
 }

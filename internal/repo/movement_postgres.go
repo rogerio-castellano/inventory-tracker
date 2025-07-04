@@ -28,7 +28,7 @@ func (r *PostgresMovementRepository) Log(productID, delta int) error {
 }
 
 // GetByProductID returns all movements for a specific product
-func (r *PostgresMovementRepository) GetByProductID(productID int, since, until *time.Time, limit, offset int) ([]models.Movement, int, error) {
+func (r *PostgresMovementRepository) GetByProductID(productID int, since, until *time.Time, limit, offset *int) ([]models.Movement, int, error) {
 	query := `SELECT id, product_id, delta, created_at FROM movements WHERE product_id = $1`
 	countQuery := `SELECT COUNT(*) FROM movements WHERE product_id = $1`
 
@@ -52,12 +52,12 @@ func (r *PostgresMovementRepository) GetByProductID(productID int, since, until 
 	}
 
 	query += " ORDER BY created_at DESC"
-	if limit > 0 {
+	if limit != nil && *limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", idx)
 		args = append(args, limit)
 		idx++
 	}
-	if offset > 0 {
+	if offset != nil {
 		query += fmt.Sprintf(" OFFSET $%d", idx)
 		args = append(args, offset)
 		idx++

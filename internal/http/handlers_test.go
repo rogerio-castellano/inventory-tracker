@@ -349,7 +349,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsCollectionResponse
+		var resp httpdelivery.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		if len(resp.Products) != 1 || !strings.Contains(strings.ToLower(resp.Products[0].Name), "phone") {
 			t.Errorf("expected one product containing 'phone', got %v", resp.Products)
@@ -364,7 +364,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsCollectionResponse
+		var resp httpdelivery.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		for _, p := range resp.Products {
 			price := p.Price
@@ -382,7 +382,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsCollectionResponse
+		var resp httpdelivery.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		for _, p := range resp.Products {
 			qty := p.Quantity
@@ -400,7 +400,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsCollectionResponse
+		var resp httpdelivery.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		if got := len(resp.Products); got != 0 {
 			t.Errorf("expected empty result, got %d items", got)
@@ -415,7 +415,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsCollectionResponse
+		var resp httpdelivery.ProductsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}
@@ -432,7 +432,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsCollectionResponse
+		var resp httpdelivery.ProductsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}
@@ -566,11 +566,11 @@ func TestGetMovementsHandler(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var movementsCollection httpdelivery.MovementsCollectionResponse
+		var movementsCollection httpdelivery.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if count := len(movementsCollection.Movements); count != 2 {
+		if count := len(movementsCollection.Data); count != 2 {
 			t.Errorf("expected 2 movements, got %d", count)
 		}
 	})
@@ -637,11 +637,11 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection httpdelivery.MovementsCollectionResponse
+		var movementsCollection httpdelivery.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if count := len(movementsCollection.Movements); count != 1 {
+		if count := len(movementsCollection.Data); count != 1 {
 			t.Errorf("expected 1 recent movement, got %d", count)
 		}
 	})
@@ -652,12 +652,12 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection httpdelivery.MovementsCollectionResponse
+		var movementsCollection httpdelivery.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if len(movementsCollection.Movements) != 1 {
-			t.Errorf("expected 1 old movement, got %d", len(movementsCollection.Movements))
+		if len(movementsCollection.Data) != 1 {
+			t.Errorf("expected 1 old movement, got %d", len(movementsCollection.Data))
 		}
 	})
 
@@ -668,11 +668,11 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection httpdelivery.MovementsCollectionResponse
+		var movementsCollection httpdelivery.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if count := len(movementsCollection.Movements); count != 2 {
+		if count := len(movementsCollection.Data); count != 2 {
 			t.Errorf("expected 2 movements, got %d", count)
 		}
 	})
@@ -684,11 +684,11 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection httpdelivery.MovementsCollectionResponse
+		var movementsCollection httpdelivery.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if count := len(movementsCollection.Movements); count != 0 {
+		if count := len(movementsCollection.Data); count != 0 {
 			t.Errorf("expected 0 movements, got %d", count)
 		}
 	})
@@ -732,14 +732,14 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp httpdelivery.MovementsCollectionResponse
+		var resp httpdelivery.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 
-		if resp.TotalCount == 0 {
+		if resp.Meta.TotalCount == 0 {
 			t.Error("expected total_count in response")
 		}
 
-		if count := len(resp.Movements); count != 1 {
+		if count := len(resp.Data); count != 1 {
 			t.Errorf("expected 1 item, got %d", count)
 		}
 	})
@@ -753,9 +753,9 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp httpdelivery.MovementsCollectionResponse
+		var resp httpdelivery.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
-		if count := len(resp.Movements); count != 2 {
+		if count := len(resp.Data); count != 2 {
 			t.Errorf("expected 2 items, got %d", count)
 		}
 	})
@@ -769,9 +769,9 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp map[string]any
+		var resp httpdelivery.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
-		items := resp["items"].([]any)
+		items := resp.Data
 		if len(items) != 1 {
 			t.Errorf("expected 1 item, got %d", len(items))
 		}
