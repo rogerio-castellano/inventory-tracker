@@ -349,8 +349,12 @@ func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sinceStr := r.URL.Query().Get("since")
-	untilStr := r.URL.Query().Get("until")
+	// Reverse the substitution from + for space in the date parameters, otherwise
+	// time.Parse will fail with an error.
+	// This is necessary because URL query parameters replace spaces with +.
+	// Example: 2025-07-03T17:44:03+02:00 becomes 2025-07-03T17:44:03 02:00 on r.URL.Query().Get()
+	sinceStr := strings.ReplaceAll(r.URL.Query().Get("since"), " ", "+")
+	untilStr := strings.ReplaceAll(r.URL.Query().Get("until"), " ", "+")
 
 	var since, until *time.Time
 	if sinceStr != "" {

@@ -10,6 +10,15 @@ type InMemoryMovementRepository struct {
 	movements []models.Movement
 }
 
+func (r *InMemoryMovementRepository) AddMovement(productId int, delta int, createdAt time.Time) {
+	movement := models.Movement{
+		ProductID: productId,
+		Delta:     delta,
+		CreatedAt: createdAt.Format(time.RFC3339),
+	}
+	r.movements = append(r.movements, movement)
+}
+
 func NewInMemoryMovementRepository() *InMemoryMovementRepository {
 	return &InMemoryMovementRepository{
 		movements: []models.Movement{},
@@ -29,10 +38,14 @@ func (r *InMemoryMovementRepository) Log(productID, delta int) error {
 }
 
 // GetByProductID returns all movements for a specific product
-func (r *InMemoryMovementRepository) GetByProductID(productID int) ([]models.Movement, error) {
+func (r *InMemoryMovementRepository) GetByProductID(productID int, since, until *time.Time) ([]models.Movement, error) {
 	var result []models.Movement
 	for _, m := range r.movements {
 		if m.ProductID == productID {
+			if (since != nil && m.CreatedAt < since.Format(time.RFC3339)) ||
+				(until != nil && m.CreatedAt > until.Format(time.RFC3339)) {
+				continue
+			}
 			result = append(result, m)
 		}
 	}

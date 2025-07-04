@@ -8,10 +8,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	httpdelivery "github.com/rogerio-castellano/inventory-tracker/internal/http"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
+
+var movementRepo *repo.InMemoryMovementRepository
 
 func init() {
 	setupTestRepo()
@@ -19,7 +22,8 @@ func init() {
 
 func setupTestRepo() {
 	httpdelivery.SetProductRepo(repo.NewInMemoryProductRepository())
-	httpdelivery.SetMovementRepo(repo.NewInMemoryMovementRepository())
+	movementRepo = repo.NewInMemoryMovementRepository()
+	httpdelivery.SetMovementRepo(movementRepo)
 }
 
 func TestCreateProductHandler_Valid(t *testing.T) {
@@ -592,6 +596,98 @@ func TestGetMovementsHandler(t *testing.T) {
 
 		var movements []httpdelivery.MovementResponse
 		json.NewDecoder(w.Body).Decode(&movements)
+		if len(movements) != 0 {
+			t.Errorf("expected 0 movements, got %d", len(movements))
+		}
+	})
+}
+
+func TestGetMovementsHandler_Filtering(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := httpdelivery.NewRouter()
+
+	// Create a product
+	create := httpdelivery.ProductRequest{Name: "FilterBox", Price: 80.0, Quantity: 10}
+	jsonCreate, _ := json.Marshal(create)
+	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreate))
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("failed to create product")
+	}
+	var created httpdelivery.ProductResponse
+	json.NewDecoder(createW.Body).Decode(&created)
+
+	// First adjustment: backdated (manually insert)
+	movementRepo.AddMovement(created.Id, 5, time.Now().Add(-48*time.Hour).UTC())
+
+	// Second adjustment: recent
+	adj := httpdelivery.MovementResponse{Delta: 2}
+	jsonAdj, _ := json.Marshal(adj)
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(jsonAdj))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("failed to adjust product")
+	}
+
+	t.Run("since: only recent movement", func(t *testing.T) {
+		since := time.Now().Add(-12 * time.Hour).Format(time.RFC3339)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements?since=%s", created.Id, since), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		var movements []httpdelivery.MovementResponse
+		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(movements) != 1 {
+			t.Errorf("expected 1 recent movement, got %d", len(movements))
+		}
+	})
+
+	t.Run("until: only old movement", func(t *testing.T) {
+		until := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements?until=%s", created.Id, until), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		var movements []httpdelivery.MovementResponse
+		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(movements) != 1 {
+			t.Errorf("expected 1 old movement, got %d", len(movements))
+		}
+	})
+
+	t.Run("since + until: full range", func(t *testing.T) {
+		since := time.Now().Add(-72 * time.Hour).Format(time.RFC3339)
+		until := time.Now().Format(time.RFC3339)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements?since=%s&until=%s", created.Id, since, until), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		var movements []httpdelivery.MovementResponse
+		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(movements) != 2 {
+			t.Errorf("expected 2 movements, got %d", len(movements))
+		}
+	})
+
+	t.Run("no match range", func(t *testing.T) {
+		since := time.Now().Add(-10 * time.Hour).Format(time.RFC3339)
+		until := time.Now().Add(-5 * time.Hour).Format(time.RFC3339)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements?since=%s&until=%s", created.Id, since, until), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		var movements []httpdelivery.MovementResponse
+		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if len(movements) != 0 {
 			t.Errorf("expected 0 movements, got %d", len(movements))
 		}
