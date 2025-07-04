@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -474,4 +475,48 @@ func validateProduct(p ProductRequest) map[string]string {
 		errs["quantity"] = "Quantity cannot be negative"
 	}
 	return errs
+}
+
+func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid product ID", http.StatusBadRequest)
+		return
+	}
+
+	format := r.URL.Query().Get("format")
+	if format != "csv" && format != "json" {
+		http.Error(w, "format must be 'csv' or 'json'", http.StatusBadRequest)
+		return
+	}
+
+	movements, _, err := movementRepo.GetByProductID(id, nil, nil, nil, nil)
+	if err != nil {
+		http.Error(w, "could not retrieve movements", http.StatusInternalServerError)
+		return
+	}
+
+	switch format {
+	case "json":
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Disposition", `attachment; filename="movements.json"`)
+		json.NewEncoder(w).Encode(movements)
+
+	case "csv":
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", `attachment; filename="movements.csv"`)
+
+		csvWriter := csv.NewWriter(w)
+		_ = csvWriter.Write([]string{"id", "product_id", "delta", "c"})
+		for _, m := range movements {
+			_ = csvWriter.Write([]string{
+				strconv.Itoa(m.ID),
+				strconv.Itoa(m.ProductID),
+				strconv.Itoa(m.Delta),
+				m.CreatedAt,
+			})
+		}
+		csvWriter.Flush()
+	}
 }

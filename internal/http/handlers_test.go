@@ -778,6 +778,80 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 	})
 }
 
+func TestExportMovementsHandler(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := httpdelivery.NewRouter()
+
+	// Create a product
+	product := httpdelivery.ProductRequest{Name: "Exportable", Price: 100.0, Quantity: 5}
+	b, _ := json.Marshal(product)
+	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("failed to create product")
+	}
+	var created map[string]any
+	json.NewDecoder(createW.Body).Decode(&created)
+	id := int(created["id"].(float64))
+
+	// Add 1 movement
+	adj := httpdelivery.QuantityAdjustmentRequest{Delta: 3}
+	body, _ := json.Marshal(adj)
+	adjReq := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(body))
+	adjW := httptest.NewRecorder()
+	r.ServeHTTP(adjW, adjReq)
+	if adjW.Code != http.StatusOK {
+		t.Fatalf("failed to adjust product")
+	}
+
+	t.Run("Export as JSON", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=json", id), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if ct := w.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
+			t.Errorf("expected application/json, got %s", ct)
+		}
+		if !strings.Contains(w.Body.String(), `"delta"`) {
+			t.Errorf("expected JSON content with field 'delta', got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Export as CSV", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=csv", id), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if ct := w.Header().Get("Content-Type"); !strings.Contains(ct, "text/csv") {
+			t.Errorf("expected text/csv, got %s", ct)
+		}
+		if !strings.Contains(w.Body.String(), "product_id,delta") {
+			t.Errorf("expected CSV header in response, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Invalid format", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements/export?format=pdf", id), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+
+	t.Run("Invalid product ID", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/products/abc/movements/export?format=json", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+}
+
 // clearAllProducts removes all products using the HTTP API endpoints.
 func clearAllProducts() {
 	r := httpdelivery.NewRouter()

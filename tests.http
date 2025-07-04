@@ -119,5 +119,7 @@ GET {{url}}/products/4/movements?limit=100 HTTP/1.1
 GET {{url}}/products/4/movements?offset=1000 HTTP/1.1
 
 ### 
+GET {{url}}/products/4/movements/export?format=csv
 
-
+### 
+GET {{url}}/products/4/movements/export?format=json
