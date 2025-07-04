@@ -32,8 +32,8 @@ type Meta struct {
 }
 
 type ProductsSearchResult struct {
-	Products []ProductResponse `json:"products"`
-	Meta     Meta              `json:"meta,omitempty"`
+	Data []ProductResponse `json:"data"`
+	Meta Meta              `json:"meta,omitempty"`
 }
 
 type QuantityAdjustmentRequest struct {
@@ -280,7 +280,7 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var response ProductsSearchResult
 	for _, p := range products {
-		response.Products = append(response.Products, ProductResponse{
+		response.Data = append(response.Data, ProductResponse{
 			Id:       p.ID,
 			Name:     p.Name,
 			Price:    p.Price,
