@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
@@ -27,12 +28,28 @@ func (r *PostgresMovementRepository) Log(productID, delta int) error {
 }
 
 // GetByProductID returns all movements for a specific product
-func (r *PostgresMovementRepository) GetByProductID(productID int) ([]models.Movement, error) {
-	query := `SELECT id, product_id, delta, created_at FROM movements WHERE product_id = $1 ORDER BY created_at DESC`
+func (r *PostgresMovementRepository) GetByProductID(productID int, since, until *time.Time) ([]models.Movement, error) {
+
+	query := `SELECT id, product_id, delta, created_at FROM movements WHERE product_id = $1`
+	args := []any{productID}
+	idx := 2
+
+	if since != nil {
+		query += fmt.Sprintf(" AND created_at >= $%d", idx)
+		args = append(args, *since)
+		idx++
+	}
+	if until != nil {
+		query += fmt.Sprintf(" AND created_at <= $%d", idx)
+		args = append(args, *until)
+		idx++
+	}
+
+	query += " ORDER BY created_at DESC"
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	rows, err := r.db.QueryContext(ctx, query, productID)
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

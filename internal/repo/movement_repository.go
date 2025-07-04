@@ -1,8 +1,12 @@
 package repo
 
-import "github.com/rogerio-castellano/inventory-tracker/internal/models"
+import (
+	"time"
+
+	"github.com/rogerio-castellano/inventory-tracker/internal/models"
+)
 
 type MovementRepository interface {
 	Log(productID, delta int) error
-	GetByProductID(productID int) ([]models.Movement, error)
+	GetByProductID(productID int, since, until *time.Time) ([]models.Movement, error)
 }

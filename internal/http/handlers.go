@@ -349,7 +349,22 @@ func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	movements, err := movementRepo.GetByProductID(id)
+	sinceStr := r.URL.Query().Get("since")
+	untilStr := r.URL.Query().Get("until")
+
+	var since, until *time.Time
+	if sinceStr != "" {
+		if ts, err := time.Parse(time.RFC3339, sinceStr); err == nil {
+			since = &ts
+		}
+	}
+	if untilStr != "" {
+		if ts, err := time.Parse(time.RFC3339, untilStr); err == nil {
+			until = &ts
+		}
+	}
+
+	movements, err := movementRepo.GetByProductID(id, since, until)
 	if err != nil {
 		log.Printf("could not retrieve movements for product %d: %v", id, err)
 		http.Error(w, "could not retrieve movements", http.StatusInternalServerError)
