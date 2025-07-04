@@ -81,3 +81,6 @@ GET {{url}}/products/4/movements?since=2025-07-03T19:50:00Z&until=2025-07-04T00:
 
 ###
 GET {{url}}/products/4/movements?offset=1&limit=2 HTTP/1.1
+
+###
+GET {{url}}/products/4/movements?limit=1 HTTP/1.1

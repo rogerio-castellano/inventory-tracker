@@ -566,12 +566,12 @@ func TestGetMovementsHandler(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var movements []httpdelivery.MovementResponse
-		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+		var movementsCollection httpdelivery.MovementsCollectionResponse
+		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if len(movements) != 2 {
-			t.Errorf("expected 2 movements, got %d", len(movements))
+		if count := len(movementsCollection.Movements); count != 2 {
+			t.Errorf("expected 2 movements, got %d", count)
 		}
 	})
 
@@ -637,12 +637,12 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movements []httpdelivery.MovementResponse
-		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+		var movementsCollection httpdelivery.MovementsCollectionResponse
+		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if len(movements) != 1 {
-			t.Errorf("expected 1 recent movement, got %d", len(movements))
+		if count := len(movementsCollection.Movements); count != 1 {
+			t.Errorf("expected 1 recent movement, got %d", count)
 		}
 	})
 
@@ -652,12 +652,12 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movements []httpdelivery.MovementResponse
-		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+		var movementsCollection httpdelivery.MovementsCollectionResponse
+		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if len(movements) != 1 {
-			t.Errorf("expected 1 old movement, got %d", len(movements))
+		if len(movementsCollection.Movements) != 1 {
+			t.Errorf("expected 1 old movement, got %d", len(movementsCollection.Movements))
 		}
 	})
 
@@ -668,12 +668,12 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movements []httpdelivery.MovementResponse
-		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+		var movementsCollection httpdelivery.MovementsCollectionResponse
+		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if len(movements) != 2 {
-			t.Errorf("expected 2 movements, got %d", len(movements))
+		if count := len(movementsCollection.Movements); count != 2 {
+			t.Errorf("expected 2 movements, got %d", count)
 		}
 	})
 
@@ -684,12 +684,96 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movements []httpdelivery.MovementResponse
-		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+		var movementsCollection httpdelivery.MovementsCollectionResponse
+		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if len(movements) != 0 {
-			t.Errorf("expected 0 movements, got %d", len(movements))
+		if count := len(movementsCollection.Movements); count != 0 {
+			t.Errorf("expected 0 movements, got %d", count)
+		}
+	})
+}
+
+func TestGetMovementsHandler_Pagination(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := httpdelivery.NewRouter()
+
+	// Create a product
+	create := httpdelivery.ProductRequest{Name: "PagedWidget", Price: 20.0, Quantity: 5}
+	jsonCreate, _ := json.Marshal(create)
+	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreate))
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("failed to create product")
+	}
+	var created httpdelivery.ProductResponse
+	json.NewDecoder(createW.Body).Decode(&created)
+
+	// Generate 3 movements
+	deltas := []int{+1, -1, +2}
+	for _, d := range deltas {
+		adj := httpdelivery.QuantityAdjustmentRequest{Delta: d}
+		b, _ := json.Marshal(adj)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(b))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("failed to adjust delta %d", d)
+		}
+	}
+
+	t.Run("limit=1 returns only one", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements?limit=1", created.Id), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+
+		var resp httpdelivery.MovementsCollectionResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+
+		if resp.TotalCount == 0 {
+			t.Error("expected total_count in response")
+		}
+
+		if count := len(resp.Movements); count != 1 {
+			t.Errorf("expected 1 item, got %d", count)
+		}
+	})
+
+	t.Run("offset=1 skips first", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements?offset=1", created.Id), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+
+		var resp httpdelivery.MovementsCollectionResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		if count := len(resp.Movements); count != 2 {
+			t.Errorf("expected 2 items, got %d", count)
+		}
+	})
+
+	t.Run("limit + offset combined", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements?limit=1&offset=1", created.Id), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+
+		var resp map[string]any
+		json.NewDecoder(w.Body).Decode(&resp)
+		items := resp["items"].([]any)
+		if len(items) != 1 {
+			t.Errorf("expected 1 item, got %d", len(items))
 		}
 	})
 }
