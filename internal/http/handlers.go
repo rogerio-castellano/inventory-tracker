@@ -27,7 +27,7 @@ type ProductResponse struct {
 	Quantity int     `json:"quantity"`
 }
 
-type ProductFilterResponse struct {
+type ProductsCollectionResponse struct {
 	Products   []ProductResponse `json:"products"`
 	TotalCount int               `json:"total_count"`
 }
@@ -41,6 +41,11 @@ type MovementResponse struct {
 	ProductID int    `json:"product_id"`
 	Delta     int    `json:"delta"`
 	CreatedAt string `json:"created_at"`
+}
+
+type MovementsCollectionResponse struct {
+	Movements  []MovementResponse `json:"movements"`
+	TotalCount int                `json:"total_count"`
 }
 
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
@@ -269,7 +274,7 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var response ProductFilterResponse
+	var response ProductsCollectionResponse
 	for _, p := range products {
 		response.Products = append(response.Products, ProductResponse{
 			Id:       p.ID,
@@ -351,7 +356,7 @@ func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Reverse the substitution from + for space in the date parameters, otherwise
 	// time.Parse will fail with an error.
-	// This is necessary because URL query parameters replace spaces with +.
+	// This is necessary because URL query parameters replace + with a space.
 	// Example: 2025-07-03T17:44:03+02:00 becomes 2025-07-03T17:44:03 02:00 on r.URL.Query().Get()
 	sinceStr := strings.ReplaceAll(r.URL.Query().Get("since"), " ", "+")
 	untilStr := strings.ReplaceAll(r.URL.Query().Get("until"), " ", "+")
@@ -368,16 +373,30 @@ func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	movements, err := movementRepo.GetByProductID(id, since, until)
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+	var limit, offset int
+	if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+		limit = v
+	}
+	if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
+		offset = v
+	}
+
+	movements, total, err := movementRepo.GetByProductID(id, since, until, limit, offset)
+
 	if err != nil {
 		log.Printf("could not retrieve movements for product %d: %v", id, err)
 		http.Error(w, "could not retrieve movements", http.StatusInternalServerError)
 		return
 	}
+	response := MovementsCollectionResponse{
+		Movements:  make([]MovementResponse, len(movements)),
+		TotalCount: total,
+	}
 
-	response := make([]MovementResponse, len(movements))
 	for i, m := range movements {
-		response[i] = MovementResponse{
+		response.Movements[i] = MovementResponse{
 			ID:        m.ID,
 			ProductID: m.ProductID,
 			Delta:     m.Delta,

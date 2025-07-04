@@ -349,7 +349,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductFilterResponse
+		var resp httpdelivery.ProductsCollectionResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 		if len(resp.Products) != 1 || !strings.Contains(strings.ToLower(resp.Products[0].Name), "phone") {
 			t.Errorf("expected one product containing 'phone', got %v", resp.Products)
@@ -364,7 +364,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductFilterResponse
+		var resp httpdelivery.ProductsCollectionResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 		for _, p := range resp.Products {
 			price := p.Price
@@ -382,7 +382,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductFilterResponse
+		var resp httpdelivery.ProductsCollectionResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 		for _, p := range resp.Products {
 			qty := p.Quantity
@@ -400,7 +400,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductFilterResponse
+		var resp httpdelivery.ProductsCollectionResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 		if got := len(resp.Products); got != 0 {
 			t.Errorf("expected empty result, got %d items", got)
@@ -415,7 +415,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductFilterResponse
+		var resp httpdelivery.ProductsCollectionResponse
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}
@@ -432,7 +432,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductFilterResponse
+		var resp httpdelivery.ProductsCollectionResponse
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}

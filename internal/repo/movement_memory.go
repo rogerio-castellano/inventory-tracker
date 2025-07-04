@@ -38,16 +38,16 @@ func (r *InMemoryMovementRepository) Log(productID, delta int) error {
 }
 
 // GetByProductID returns all movements for a specific product
-func (r *InMemoryMovementRepository) GetByProductID(productID int, since, until *time.Time) ([]models.Movement, error) {
-	var result []models.Movement
+func (r *InMemoryMovementRepository) GetByProductID(productID int, since, until *time.Time, limit, offset int) ([]models.Movement, int, error) {
+	var movements []models.Movement
 	for _, m := range r.movements {
 		if m.ProductID == productID {
 			if (since != nil && m.CreatedAt < since.Format(time.RFC3339)) ||
 				(until != nil && m.CreatedAt > until.Format(time.RFC3339)) {
 				continue
 			}
-			result = append(result, m)
+			movements = append(movements, m)
 		}
 	}
-	return result, nil
+	return movements, 0, nil
 }

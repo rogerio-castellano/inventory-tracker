@@ -28,30 +28,53 @@ func (r *PostgresMovementRepository) Log(productID, delta int) error {
 }
 
 // GetByProductID returns all movements for a specific product
-func (r *PostgresMovementRepository) GetByProductID(productID int, since, until *time.Time) ([]models.Movement, error) {
-
+func (r *PostgresMovementRepository) GetByProductID(productID int, since, until *time.Time, limit, offset int) ([]models.Movement, int, error) {
 	query := `SELECT id, product_id, delta, created_at FROM movements WHERE product_id = $1`
+	countQuery := `SELECT COUNT(*) FROM movements WHERE product_id = $1`
+
 	args := []any{productID}
+	countArgs := []any{productID}
 	idx := 2
 
 	if since != nil {
 		query += fmt.Sprintf(" AND created_at >= $%d", idx)
+		countQuery += fmt.Sprintf(" AND created_at >= $%d", idx)
 		args = append(args, *since)
+		countArgs = append(countArgs, *since)
 		idx++
 	}
 	if until != nil {
 		query += fmt.Sprintf(" AND created_at <= $%d", idx)
+		countQuery += fmt.Sprintf(" AND created_at <= $%d", idx)
 		args = append(args, *until)
+		countArgs = append(countArgs, *until)
 		idx++
 	}
 
 	query += " ORDER BY created_at DESC"
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", idx)
+		args = append(args, limit)
+		idx++
+	}
+	if offset > 0 {
+		query += fmt.Sprintf(" OFFSET $%d", idx)
+		args = append(args, offset)
+		idx++
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	// Count total
+	var total int
+	if err := r.db.QueryRowContext(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -59,9 +82,9 @@ func (r *PostgresMovementRepository) GetByProductID(productID int, since, until 
 	for rows.Next() {
 		var m models.Movement
 		if err := rows.Scan(&m.ID, &m.ProductID, &m.Delta, &m.CreatedAt); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		movements = append(movements, m)
 	}
-	return movements, nil
+	return movements, total, nil
 }
