@@ -19,6 +19,7 @@ func init() {
 
 func setupTestRepo() {
 	httpdelivery.SetProductRepo(repo.NewInMemoryProductRepository())
+	httpdelivery.SetMovementRepo(repo.NewInMemoryMovementRepository())
 }
 
 func TestCreateProductHandler_Valid(t *testing.T) {
@@ -442,7 +443,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	r := httpdelivery.NewRouter()
 
 	// Create a product
-	create := map[string]any{"name": "InventoryItem", "price": 10.0, "quantity": 10}
+	create := httpdelivery.ProductRequest{Name: "InventoryItem", Price: 10.0, Quantity: 10}
 	body, _ := json.Marshal(create)
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
 	w := httptest.NewRecorder()
@@ -450,48 +451,47 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created map[string]any
+	var created httpdelivery.ProductRequest
 	json.NewDecoder(w.Body).Decode(&created)
-	id := int(created["id"].(float64))
 
 	t.Run("Increase quantity", func(t *testing.T) {
-		adj := map[string]int{"delta": 5}
+		adj := httpdelivery.QuantityAdjustmentRequest{Delta: 5}
 		body, _ := json.Marshal(adj)
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp map[string]any
+		var resp httpdelivery.ProductResponse
 		json.NewDecoder(w.Body).Decode(&resp)
-		if resp["quantity"] != 15.0 {
-			t.Errorf("expected quantity 15, got %v", resp["quantity"])
+		if resp.Quantity != 15 {
+			t.Errorf("expected quantity 15, got %v", resp.Quantity)
 		}
 	})
 
 	t.Run("Decrease quantity", func(t *testing.T) {
-		adj := map[string]int{"delta": -3}
+		adj := httpdelivery.QuantityAdjustmentRequest{Delta: -3}
 		body, _ := json.Marshal(adj)
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp map[string]any
+		var resp httpdelivery.ProductResponse
 		json.NewDecoder(w.Body).Decode(&resp)
-		if resp["quantity"] != 12.0 {
-			t.Errorf("expected quantity 12, got %v", resp["quantity"])
+		if resp.Quantity != 12.0 {
+			t.Errorf("expected quantity 12, got %v", resp.Quantity)
 		}
 	})
 
 	t.Run("Too much decrease (underflow)", func(t *testing.T) {
-		adj := map[string]int{"delta": -100}
+		adj := httpdelivery.QuantityAdjustmentRequest{Delta: -100}
 		body, _ := json.Marshal(adj)
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
@@ -501,7 +501,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Invalid ID", func(t *testing.T) {
-		adj := map[string]int{"delta": 1}
+		adj := httpdelivery.QuantityAdjustmentRequest{Delta: 1}
 		body, _ := json.Marshal(adj)
 		req := httptest.NewRequest(http.MethodPost, "/products/abc/adjust", bytes.NewReader(body))
 		w := httptest.NewRecorder()
@@ -513,12 +513,87 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewBufferString(`{`))
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewBufferString(`{`))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+}
+
+func TestGetMovementsHandler(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := httpdelivery.NewRouter()
+
+	// Create a product
+	product := httpdelivery.ProductRequest{Name: "Box", Price: 50.0, Quantity: 10}
+	body, _ := json.Marshal(product)
+	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("failed to create product")
+	}
+	var created httpdelivery.ProductResponse
+	json.NewDecoder(createW.Body).Decode(&created)
+
+	// Adjust quantity twice to generate movement log
+	adjust := func(delta int) {
+		adj := httpdelivery.QuantityAdjustmentRequest{Delta: delta}
+		body, _ := json.Marshal(adj)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("failed to adjust quantity: delta %d", delta)
+		}
+	}
+	adjust(3)
+	adjust(-2)
+
+	t.Run("Returns movements", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d/movements", created.Id), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+
+		var movements []httpdelivery.MovementResponse
+		if err := json.NewDecoder(w.Body).Decode(&movements); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(movements) != 2 {
+			t.Errorf("expected 2 movements, got %d", len(movements))
+		}
+	})
+
+	t.Run("Invalid product ID", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/products/abc/movements", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+
+	t.Run("No movements for nonexistent product", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/products/999999/movements", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("expected 200 OK (empty list), got %d", w.Code)
+		}
+
+		var movements []httpdelivery.MovementResponse
+		json.NewDecoder(w.Body).Decode(&movements)
+		if len(movements) != 0 {
+			t.Errorf("expected 0 movements, got %d", len(movements))
 		}
 	})
 }
@@ -532,12 +607,12 @@ func clearAllProducts() {
 	if getW.Code != http.StatusOK {
 		return // nothing to clear or error
 	}
-	var products []map[string]any
+	var products []httpdelivery.ProductResponse
 	if err := json.NewDecoder(getW.Body).Decode(&products); err != nil {
 		return
 	}
 	for _, p := range products {
-		id := fmt.Sprintf("%v", p["id"])
+		id := fmt.Sprintf("%v", p.Id)
 		deleteReq := httptest.NewRequest(http.MethodDelete, "/products/"+id, nil)
 		deleteW := httptest.NewRecorder()
 		r.ServeHTTP(deleteW, deleteReq)

@@ -36,6 +36,13 @@ type QuantityAdjustmentRequest struct {
 	Delta int `json:"delta"` // can be positive or negative
 }
 
+type MovementResponse struct {
+	ID        int    `json:"id"`
+	ProductID int    `json:"product_id"`
+	Delta     int    `json:"delta"`
+	CreatedAt string `json:"created_at"`
+}
+
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	var req ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -83,9 +90,9 @@ func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not fetch products", http.StatusInternalServerError)
 		return
 	}
-	responses := make([]ProductResponse, len(products))
+	response := make([]ProductResponse, len(products))
 	for i, p := range products {
-		responses[i] = ProductResponse{
+		response[i] = ProductResponse{
 			Id:       p.ID,
 			Name:     p.Name,
 			Price:    p.Price,
@@ -93,7 +100,7 @@ func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(responses)
+	json.NewEncoder(w).Encode(response)
 }
 
 func GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
@@ -349,8 +356,18 @@ func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := make([]MovementResponse, len(movements))
+	for i, m := range movements {
+		response[i] = MovementResponse{
+			ID:        m.ID,
+			ProductID: m.ProductID,
+			Delta:     m.Delta,
+			CreatedAt: m.CreatedAt,
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(movements)
+	json.NewEncoder(w).Encode(response)
 }
 
 func validateProduct(p ProductRequest) map[string]string {
