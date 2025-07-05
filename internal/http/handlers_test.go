@@ -1240,7 +1240,7 @@ func clearAllProducts() {
 }
 
 func generateToken(r http.Handler, username, password string) (string, error) {
-	payload := map[string]string{"username": "admin", "password": "secret"}
+	payload := map[string]string{"username": username, "password": password}
 	body, _ := json.Marshal(payload)
 	loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 	loginW := httptest.NewRecorder()
