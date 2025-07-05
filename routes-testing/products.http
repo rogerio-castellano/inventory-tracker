@@ -1,0 +1,87 @@
+@url=http://localhost:8080
+@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE3MTEzODksInN1YiI6MSwidXNlcm5hbWUiOiJhZG1pbiJ9.YVx_xteDj_gMhHRYI5fWC5zrdr9Ngi6_QYOCMRaTdvA
+
+# Login with valid credentials
+POST {{url}}/login HTTP/1.1
+Content-Type: application/json
+
+{
+    "username": "admin",
+    "password": "secret"
+}
+
+### Valid product creation
+POST {{url}}/products HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "name": "Book",
+    "price": 1.23,
+    "quantity": 1
+}
+
+###
+GET {{url}}/products HTTP/1.1
+
+###
+GET {{url}}/products/1 HTTP/1.1
+
+###
+DELETE {{url}}/products/5 HTTP/1.1
+Authorization: Bearer {{token}}
+
+###
+PUT {{url}}/products/7 HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "id" : 7,
+    "name": "Go Programming Language",
+    "price": 4.44,
+    "quantity": 4
+}
+
+### Filter products
+GET {{url}}/products/filter?name=o&minQty=2&maxQty=4&minPrice=1&maxPrice=4.44 HTTP/1.1
+
+###
+GET {{url}}/products/filter?offset=1&limit=2 HTTP/1.1
+
+
+### Adjust quantity
+POST {{url}}/products/4/adjust HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "delta": 2
+}
+
+### 
+POST {{url}}/products/4/adjust HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "delta": -2
+}
+
+###
+POST {{url}}/products/4/adjust HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "delta": -100
+}
+
+### 
+POST {{url}}/products/1000/adjust HTTP/1.1
+Content-Type: application/json
+
+{
+    "delta": -2
+}
+

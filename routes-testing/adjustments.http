@@ -1,0 +1,47 @@
+@url=http://localhost:8080
+@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE3MTEzODksInN1YiI6MSwidXNlcm5hbWUiOiJhZG1pbiJ9.YVx_xteDj_gMhHRYI5fWC5zrdr9Ngi6_QYOCMRaTdvA
+
+# Login with valid credentials
+POST {{url}}/login HTTP/1.1
+Content-Type: application/json
+
+{
+    "username": "admin",
+    "password": "secret"
+}
+
+### Adjust quantity
+POST {{url}}/products/4/adjust HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "delta": 2
+}
+
+### 
+POST {{url}}/products/4/adjust HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "delta": -2
+}
+
+###
+POST {{url}}/products/4/adjust HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "delta": -100
+}
+
+### 
+POST {{url}}/products/1000/adjust HTTP/1.1
+Content-Type: application/json
+
+{
+    "delta": -2
+}
+
