@@ -13,6 +13,11 @@ type InMemoryProductRepository struct {
 	nextID   int
 }
 
+// AdjustQuantity implements ProductRepository.
+func (r *InMemoryProductRepository) AdjustQuantity(productId int, delta int) (models.Product, error) {
+	panic("unimplemented")
+}
+
 // NewInMemoryProductRepository creates a new instance of InMemoryProductRepository.
 func NewInMemoryProductRepository() *InMemoryProductRepository {
 	return &InMemoryProductRepository{

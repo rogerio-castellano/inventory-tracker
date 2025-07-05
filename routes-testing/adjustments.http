@@ -10,6 +10,9 @@ Content-Type: application/json
     "password": "secret"
 }
 
+### Get product to verify adjustments
+GET {{url}}/products/4 HTTP/1.1
+
 ### Adjust quantity
 POST {{url}}/products/4/adjust HTTP/1.1
 Content-Type: application/json

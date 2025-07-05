@@ -175,3 +175,25 @@ func filterConditions(name string, minPrice, maxPrice *float64, minQty, maxQty *
 
 	return query, args, argIdx
 }
+
+func (r *PostgresProductRepository) AdjustQuantity(productID int, delta int) (models.Product, error) {
+	query := `
+		UPDATE products
+		SET quantity = quantity + $1, updated_at = $2
+		WHERE id = $3 AND quantity + $1 >= 0
+		RETURNING id, name, price, quantity, created_at, updated_at
+	`
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var p models.Product
+	err := r.db.QueryRowContext(ctx, query, delta, time.Now().UTC(), productID).
+		Scan(&p.ID, &p.Name, &p.Price, &p.Quantity, &p.CreatedAt, &p.UpdatedAt)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return models.Product{}, ErrInvalidQuantityChange
+	}
+	return p, err
+}
+
+var ErrInvalidQuantityChange = errors.New("insufficient quantity or product not found")

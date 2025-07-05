@@ -313,46 +313,25 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	product, err := productRepo.GetByID(id)
+	product, err := productRepo.AdjustQuantity(id, req.Delta)
 	if err != nil {
-		if err == repo.ErrProductNotFound {
-			http.Error(w, "product not found", http.StatusNotFound)
+		if err == repo.ErrInvalidQuantityChange {
+			http.Error(w, "invalid quantity adjustment", http.StatusBadRequest)
 			return
 		}
-		http.Error(w, "failed to fetch product", http.StatusInternalServerError)
+		http.Error(w, "could not update quantity", http.StatusInternalServerError)
 		return
 	}
-
-	newQty := product.Quantity + req.Delta
-	if newQty < 0 {
-		http.Error(w, "quantity cannot be negative", http.StatusConflict)
-		return
-	}
-
-	product.Quantity = newQty
-	product.UpdatedAt = time.Now().Format(time.RFC3339)
-
-	updated, err := productRepo.Update(product)
-	if err != nil {
-		http.Error(w, "could not update product", http.StatusInternalServerError)
-		return
-	}
-
-	err = movementRepo.Log(id, req.Delta)
-	if err != nil {
-		// Log the error but do not return it to the user
-		// This allows the product update to succeed even if logging fails
-		log.Printf("could not log movement for product %d, delta %d: %v", id, req.Delta, err)
-	}
+	_ = movementRepo.Log(id, req.Delta)
 
 	resp := ProductResponse{
-		Id:       updated.ID,
-		Name:     updated.Name,
-		Price:    updated.Price,
-		Quantity: updated.Quantity,
+		Id:       product.ID,
+		Name:     product.Name,
+		Price:    product.Price,
+		Quantity: product.Quantity,
 	}
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+
 }
 
 func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
