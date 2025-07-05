@@ -1,5 +1,5 @@
 @url=http://localhost:8080
-@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE3MTEzODksInN1YiI6MSwidXNlcm5hbWUiOiJhZG1pbiJ9.YVx_xteDj_gMhHRYI5fWC5zrdr9Ngi6_QYOCMRaTdvA
+@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE3NDUwNTAsInN1YiI6MSwidXNlcm5hbWUiOiJhZG1pbiJ9.li5sJwXz6lC1ucwzwYnTNsA56Uv4k79ZHyV0jnzCMJ8
 
 # Login with valid credentials
 POST {{url}}/login HTTP/1.1
@@ -18,7 +18,8 @@ Authorization: Bearer {{token}}
 {
     "name": "Book",
     "price": 1.23,
-    "quantity": 1
+    "quantity": 1,
+    "threshold": 2
 }
 
 ###
@@ -40,7 +41,8 @@ Authorization: Bearer {{token}}
     "id" : 7,
     "name": "Go Programming Language",
     "price": 4.44,
-    "quantity": 4
+    "quantity": 11,
+    "threshold": 12
 }
 
 ### Filter products

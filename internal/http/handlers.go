@@ -19,17 +19,20 @@ import (
 var userRepo repo.UserRepository
 
 type ProductRequest struct {
-	Id       int     `json:"id,omitempty"`
-	Name     string  `json:"name"`
-	Price    float64 `json:"price"`
-	Quantity int     `json:"quantity"`
+	Id        int     `json:"id,omitempty"`
+	Name      string  `json:"name"`
+	Price     float64 `json:"price"`
+	Quantity  int     `json:"quantity"`
+	Threshold int     `json:"threshold"`
 }
 
 type ProductResponse struct {
-	Id       int     `json:"id"`
-	Name     string  `json:"name"`
-	Price    float64 `json:"price"`
-	Quantity int     `json:"quantity"`
+	Id        int     `json:"id"`
+	Name      string  `json:"name"`
+	Price     float64 `json:"price"`
+	Quantity  int     `json:"quantity"`
+	Threshold int     `json:"threshold"`
+	LowStock  bool    `json:"low_stock,omitempty"` // Optional field to indicate low stock
 }
 
 type Meta struct {
@@ -77,6 +80,7 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 		Name:      req.Name,
 		Price:     req.Price,
 		Quantity:  req.Quantity,
+		Threshold: req.Threshold,
 		CreatedAt: time.Now().Format(time.RFC3339),
 		UpdatedAt: time.Now().Format(time.RFC3339),
 	}
@@ -87,10 +91,12 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ProductResponse{
-		Id:       created.ID,
-		Name:     created.Name,
-		Price:    created.Price,
-		Quantity: created.Quantity,
+		Id:        created.ID,
+		Name:      created.Name,
+		Price:     created.Price,
+		Quantity:  created.Quantity,
+		Threshold: created.Threshold,
+		LowStock:  created.Quantity < created.Threshold,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -107,10 +113,12 @@ func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
 	response := make([]ProductResponse, len(products))
 	for i, p := range products {
 		response[i] = ProductResponse{
-			Id:       p.ID,
-			Name:     p.Name,
-			Price:    p.Price,
-			Quantity: p.Quantity,
+			Id:        p.ID,
+			Name:      p.Name,
+			Price:     p.Price,
+			Quantity:  p.Quantity,
+			Threshold: p.Threshold,
+			LowStock:  p.Quantity < p.Threshold,
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -135,10 +143,12 @@ func GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := ProductResponse{
-		Id:       product.ID,
-		Name:     product.Name,
-		Price:    product.Price,
-		Quantity: product.Quantity,
+		Id:        product.ID,
+		Name:      product.Name,
+		Price:     product.Price,
+		Quantity:  product.Quantity,
+		Threshold: product.Threshold,
+		LowStock:  product.Quantity < product.Threshold,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -194,6 +204,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		Name:      req.Name,
 		Price:     req.Price,
 		Quantity:  req.Quantity,
+		Threshold: req.Threshold,
 		UpdatedAt: time.Now().Format(time.RFC3339),
 	}
 	updated, err := productRepo.Update(product)
@@ -207,10 +218,12 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ProductResponse{
-		Id:       updated.ID,
-		Name:     updated.Name,
-		Price:    updated.Price,
-		Quantity: updated.Quantity,
+		Id:        updated.ID,
+		Name:      updated.Name,
+		Price:     updated.Price,
+		Quantity:  updated.Quantity,
+		Threshold: updated.Threshold,
+		LowStock:  updated.Quantity < updated.Threshold,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -286,10 +299,12 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 	var response ProductsSearchResult
 	for _, p := range products {
 		response.Data = append(response.Data, ProductResponse{
-			Id:       p.ID,
-			Name:     p.Name,
-			Price:    p.Price,
-			Quantity: p.Quantity,
+			Id:        p.ID,
+			Name:      p.Name,
+			Price:     p.Price,
+			Quantity:  p.Quantity,
+			Threshold: p.Threshold,
+			LowStock:  p.Quantity < p.Threshold,
 		})
 	}
 
@@ -324,12 +339,23 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = movementRepo.Log(id, req.Delta)
 
-	resp := ProductResponse{
-		Id:       product.ID,
-		Name:     product.Name,
-		Price:    product.Price,
-		Quantity: product.Quantity,
+	if product.Quantity < product.Threshold {
+		log.Printf("⚠️ ALERT: Product %d (%s) is below threshold! Qty=%d, Threshold=%d",
+			product.ID, product.Name, product.Quantity, product.Threshold)
 	}
+
+	resp := ProductResponse{
+		Id:        product.ID,
+		Name:      product.Name,
+		Price:     product.Price,
+		Quantity:  product.Quantity,
+		Threshold: product.Threshold,
+		LowStock:  product.Quantity < product.Threshold,
+	}
+	if product.Quantity < product.Threshold {
+		resp.LowStock = true
+	}
+
 	json.NewEncoder(w).Encode(resp)
 
 }
