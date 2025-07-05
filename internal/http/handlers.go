@@ -13,7 +13,10 @@ import (
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	models "github.com/rogerio-castellano/inventory-tracker/internal/models"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
+	"golang.org/x/crypto/bcrypt"
 )
+
+var userRepo repo.UserRepository
 
 type ProductRequest struct {
 	Id       int     `json:"id,omitempty"`
@@ -554,18 +557,26 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 🚨 Replace with real user validation
-	if creds.Username != "admin" || creds.Password != "secret" {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, err := userRepo.GetByUsername(creds.Username)
+	if err != nil {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
-	token, err := auth.GenerateToken(1, creds.Username)
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(creds.Password)) != nil {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := auth.GenerateToken(user.ID, user.Username)
 	if err != nil {
 		http.Error(w, "could not generate token", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
+}
+
+func SetUserRepo(r repo.UserRepository) {
+	userRepo = r
 }
