@@ -1167,6 +1167,73 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 	})
 }
 
+func TestLowStockAlert(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := api.NewRouter()
+
+	// Create product with quantity 5 and threshold 3
+	create := api.ProductRequest{
+		Name:      "AlertItem",
+		Price:     50.0,
+		Quantity:  5,
+		Threshold: 3,
+	}
+	body, _ := json.Marshal(create)
+	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("failed to create product: %d", w.Code)
+	}
+	var created map[string]any
+	json.NewDecoder(w.Body).Decode(&created)
+	id := int(created["id"].(float64))
+
+	// Adjust to just above threshold (5 → 4) → no alert
+	t.Run("No alert above threshold", func(t *testing.T) {
+		payload := map[string]int{"delta": -1}
+		b, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+
+		var resp map[string]any
+		json.NewDecoder(w.Body).Decode(&resp)
+
+		if resp["low_stock"] != nil {
+			t.Error("expected no low_stock alert above threshold")
+		}
+	})
+
+	// Adjust to below threshold (4 → 2) → should trigger alert
+	t.Run("Alert triggered below threshold", func(t *testing.T) {
+		payload := map[string]int{"delta": -2}
+		b, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d", w.Code)
+		}
+
+		var resp map[string]any
+		json.NewDecoder(w.Body).Decode(&resp)
+
+		if resp["low_stock"] != true {
+			t.Error("expected low_stock alert to be true")
+		}
+	})
+}
+
 // clearAllProducts removes all products using the HTTP API endpoints.
 func clearAllProducts() {
 	productRepo.Clear()
