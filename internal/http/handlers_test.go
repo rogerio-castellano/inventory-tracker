@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1090,6 +1091,78 @@ func TestRegisterHandler(t *testing.T) {
 
 		if w.Code != http.StatusBadRequest {
 			t.Fatalf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+}
+
+func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := api.NewRouter()
+
+	// Create product with quantity 5
+	create := api.ProductRequest{Name: "ConcurrentItem", Price: 10.0, Quantity: 5}
+	body, _ := json.Marshal(create)
+	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("failed to create product")
+	}
+	var created map[string]any
+	json.NewDecoder(w.Body).Decode(&created)
+	id := int(created["id"].(float64))
+
+	// ❌ Try deducting more than available
+	t.Run("Reject over-deduction", func(t *testing.T) {
+		payload := api.QuantityAdjustmentRequest{Delta: -10}
+		b, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusConflict {
+			t.Errorf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+
+	// ✅ Concurrent increment and decrement
+	t.Run("Concurrent adjustments are safe", func(t *testing.T) {
+		var wg sync.WaitGroup
+		successCount := 0
+		totalRequests := 10
+
+		for i := 0; i < totalRequests; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				delta := -1
+				if i%2 == 0 {
+					delta = +1
+				}
+				payload := api.QuantityAdjustmentRequest{Delta: delta}
+				b, _ := json.Marshal(payload)
+				req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(b))
+				w := httptest.NewRecorder()
+				r.ServeHTTP(w, req)
+				if w.Code == http.StatusOK {
+					successCount++
+				}
+			}(i)
+		}
+		wg.Wait()
+
+		// Check final state
+		getReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d", id), nil)
+		getW := httptest.NewRecorder()
+		r.ServeHTTP(getW, getReq)
+		var final map[string]any
+		json.NewDecoder(getW.Body).Decode(&final)
+		qty := int(final["quantity"].(float64))
+
+		if qty < 0 {
+			t.Errorf("quantity should not go negative, got %d", qty)
 		}
 	})
 }

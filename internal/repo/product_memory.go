@@ -1,7 +1,6 @@
 package repo
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
@@ -11,11 +10,6 @@ import (
 type InMemoryProductRepository struct {
 	products []models.Product
 	nextID   int
-}
-
-// AdjustQuantity implements ProductRepository.
-func (r *InMemoryProductRepository) AdjustQuantity(productId int, delta int) (models.Product, error) {
-	panic("unimplemented")
 }
 
 // NewInMemoryProductRepository creates a new instance of InMemoryProductRepository.
@@ -112,9 +106,25 @@ func (r *InMemoryProductRepository) Delete(id int) error {
 	return ErrProductNotFound
 }
 
-// ErrProductNotFound is returned when a product is not found in the repository.
-var ErrProductNotFound = errors.New("product not found")
-
 func (r *InMemoryProductRepository) Clear() {
 	r.products = []models.Product{}
+}
+
+// AdjustQuantity implements ProductRepository.
+func (r *InMemoryProductRepository) AdjustQuantity(productId int, delta int) (models.Product, error) {
+	product, _ := r.GetByID(productId)
+
+	if product.Quantity+delta < 0 {
+		return models.Product{}, ErrInvalidQuantityChange
+	}
+
+	product.Quantity += delta
+	for i, p := range r.products {
+		if p.ID == productId {
+			r.products[i] = product
+			return product, nil
+		}
+	}
+
+	return models.Product{}, ErrProductNotFound
 }

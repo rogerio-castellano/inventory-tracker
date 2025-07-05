@@ -316,7 +316,7 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 	product, err := productRepo.AdjustQuantity(id, req.Delta)
 	if err != nil {
 		if err == repo.ErrInvalidQuantityChange {
-			http.Error(w, "invalid quantity adjustment", http.StatusBadRequest)
+			http.Error(w, "quantity cannot be negative", http.StatusConflict)
 			return
 		}
 		http.Error(w, "could not update quantity", http.StatusInternalServerError)

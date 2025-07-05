@@ -195,5 +195,3 @@ func (r *PostgresProductRepository) AdjustQuantity(productID int, delta int) (mo
 	}
 	return p, err
 }
-
-var ErrInvalidQuantityChange = errors.New("insufficient quantity or product not found")
