@@ -13,6 +13,7 @@ import (
 	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var movementRepo *repo.InMemoryMovementRepository
@@ -20,9 +21,10 @@ var productRepo *repo.InMemoryProductRepository
 var token string
 
 func init() {
-	setupTestRepo()
+	testPassword := "secret"
+	setupTestRepo(testPassword)
 	r := api.NewRouter()
-	newToken, err := generateToken(r, "admin", "secret")
+	newToken, err := generateToken(r, "admin", testPassword)
 	if err != nil {
 		panic(fmt.Sprintf("error generating token: %v", err))
 	}
@@ -30,7 +32,7 @@ func init() {
 	token = newToken
 }
 
-func setupTestRepo() {
+func setupTestRepo(testPassword string) {
 	productRepo = repo.NewInMemoryProductRepository()
 	api.SetProductRepo(productRepo)
 	movementRepo = repo.NewInMemoryMovementRepository()
@@ -38,9 +40,10 @@ func setupTestRepo() {
 	userRepo := repo.NewInMemoryUserRepository()
 	api.SetUserRepo(userRepo)
 	// Pre-populate with an admin user
+	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
 	userRepo.CreateUser(models.User{
 		Username:     "admin",
-		PasswordHash: "$2y$10$Q20mohJyT0SatlDqMxQLN.cQF6oN6EGjq2fl8Hemm4mC2sfQv7gF.", // bcrypt hash of "secret"
+		PasswordHash: string(passwordHash),
 	})
 }
 
