@@ -5,3 +5,5 @@ create_table("users") {
   t.Column("created_at", "timestamp", {"default": "now()"})
   t.Column("updated_at", "timestamp", {"default": "now()"})
 }
+
+add_index("users", "username", {"unique": true})
