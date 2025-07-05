@@ -109,3 +109,7 @@ func (r *InMemoryProductRepository) Delete(id int) error {
 
 // ErrProductNotFound is returned when a product is not found in the repository.
 var ErrProductNotFound = errors.New("product not found")
+
+func (r *InMemoryProductRepository) Clear() {
+	r.products = []models.Product{}
+}

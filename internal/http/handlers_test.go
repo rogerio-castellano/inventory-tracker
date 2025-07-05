@@ -16,6 +16,7 @@ import (
 )
 
 var movementRepo *repo.InMemoryMovementRepository
+var productRepo *repo.InMemoryProductRepository
 var token string
 
 func init() {
@@ -30,7 +31,8 @@ func init() {
 }
 
 func setupTestRepo() {
-	api.SetProductRepo(repo.NewInMemoryProductRepository())
+	productRepo = repo.NewInMemoryProductRepository()
+	api.SetProductRepo(productRepo)
 	movementRepo = repo.NewInMemoryMovementRepository()
 	api.SetMovementRepo(movementRepo)
 	userRepo := repo.NewInMemoryUserRepository()
@@ -1091,24 +1093,7 @@ func TestRegisterHandler(t *testing.T) {
 
 // clearAllProducts removes all products using the HTTP API endpoints.
 func clearAllProducts() {
-	r := api.NewRouter()
-	getReq := httptest.NewRequest(http.MethodGet, "/products", nil)
-	getW := httptest.NewRecorder()
-	r.ServeHTTP(getW, getReq)
-	if getW.Code != http.StatusOK {
-		return // nothing to clear or error
-	}
-	var products []api.ProductResponse
-	if err := json.NewDecoder(getW.Body).Decode(&products); err != nil {
-		return
-	}
-	for _, p := range products {
-		id := fmt.Sprintf("%v", p.Id)
-		deleteReq := httptest.NewRequest(http.MethodDelete, "/products/"+id, nil)
-		deleteReq.Header.Set("Authorization", "Bearer "+token)
-		deleteW := httptest.NewRecorder()
-		r.ServeHTTP(deleteW, deleteReq)
-	}
+	productRepo.Clear()
 }
 
 func generateToken(r http.Handler, username, password string) (string, error) {
