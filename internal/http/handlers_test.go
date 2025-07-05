@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	httpdelivery "github.com/rogerio-castellano/inventory-tracker/internal/http"
+	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
+	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
@@ -19,7 +20,7 @@ var token string
 
 func init() {
 	setupTestRepo()
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 	newToken, err := generateToken(r, "admin", "secret")
 	if err != nil {
 		panic(fmt.Sprintf("error generating token: %v", err))
@@ -29,15 +30,22 @@ func init() {
 }
 
 func setupTestRepo() {
-	httpdelivery.SetProductRepo(repo.NewInMemoryProductRepository())
+	api.SetProductRepo(repo.NewInMemoryProductRepository())
 	movementRepo = repo.NewInMemoryMovementRepository()
-	httpdelivery.SetMovementRepo(movementRepo)
+	api.SetMovementRepo(movementRepo)
+	userRepo := repo.NewInMemoryUserRepository()
+	api.SetUserRepo(userRepo)
+	// Pre-populate with an admin user
+	userRepo.CreateUser(models.User{
+		Username:     "admin",
+		PasswordHash: "$2y$10$Q20mohJyT0SatlDqMxQLN.cQF6oN6EGjq2fl8Hemm4mC2sfQv7gF.", // bcrypt hash of "secret"
+	})
 }
 
 func TestCreateProductHandler_Valid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
-	body := httpdelivery.ProductRequest{Name: "Laptop", Price: 1500.0, Quantity: 1}
+	r := api.NewRouter()
+	body := api.ProductRequest{Name: "Laptop", Price: 1500.0, Quantity: 1}
 
 	jsonBody, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonBody))
@@ -49,7 +57,7 @@ func TestCreateProductHandler_Valid(t *testing.T) {
 		t.Fatalf("expected 201 Created, got %d", w.Code)
 	}
 
-	var resp httpdelivery.ProductResponse
+	var resp api.ProductResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
@@ -67,35 +75,35 @@ func TestCreateProductHandler_Valid(t *testing.T) {
 
 func TestCreateProductHandler_Invalid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	tests := []struct {
 		name           string
-		payload        httpdelivery.ProductRequest
+		payload        api.ProductRequest
 		expectCode     int
 		expectedErrors []string
 	}{
 		{
 			name:           "Empty name and price",
-			payload:        httpdelivery.ProductRequest{Name: "", Price: 0.0},
+			payload:        api.ProductRequest{Name: "", Price: 0.0},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"name", "price"},
 		},
 		{
 			name:           "Empty name only",
-			payload:        httpdelivery.ProductRequest{Name: "", Price: 100.0},
+			payload:        api.ProductRequest{Name: "", Price: 100.0},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"name"},
 		},
 		{
 			name:           "Invalid price only",
-			payload:        httpdelivery.ProductRequest{Name: "Mouse", Price: -5.0},
+			payload:        api.ProductRequest{Name: "Mouse", Price: -5.0},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"price"},
 		},
 		{
 			name:           "Negative quantity",
-			payload:        httpdelivery.ProductRequest{Name: "Keyboard", Price: 50.0, Quantity: -1},
+			payload:        api.ProductRequest{Name: "Keyboard", Price: 50.0, Quantity: -1},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"quantity"},
 		},
@@ -130,7 +138,7 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 
 func TestCreateProductHandler_MalformedJSON(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	badJSON := `{Name: "Invalid" Price: 100 "}` // missing comma
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewBufferString(badJSON))
@@ -151,10 +159,10 @@ func TestCreateProductHandler_MalformedJSON(t *testing.T) {
 
 func TestGetProductsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	// Create products to ensure we have something to retrieve
-	createBody := httpdelivery.ProductRequest{Name: "Phone", Price: 999.99, Quantity: 1}
+	createBody := api.ProductRequest{Name: "Phone", Price: 999.99, Quantity: 1}
 	jsonCreateBody, _ := json.Marshal(createBody)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody))
 	createReq.Header.Set("Authorization", "Bearer "+token)
@@ -165,7 +173,7 @@ func TestGetProductsHandler(t *testing.T) {
 	}
 
 	// Create a second product
-	createBody2 := httpdelivery.ProductRequest{Name: "Tablet", Price: 499.99, Quantity: 2}
+	createBody2 := api.ProductRequest{Name: "Tablet", Price: 499.99, Quantity: 2}
 	jsonCreateBody2, _ := json.Marshal(createBody2)
 	createReq2 := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody2))
 	createReq2.Header.Set("Authorization", "Bearer "+token)
@@ -184,7 +192,7 @@ func TestGetProductsHandler(t *testing.T) {
 		t.Fatalf("expected 200 OK for product retrieval, got %d", getW.Code)
 	}
 
-	var products []httpdelivery.ProductResponse
+	var products []api.ProductResponse
 	if err := json.NewDecoder(getW.Body).Decode(&products); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
@@ -220,10 +228,10 @@ func TestGetProductsHandler(t *testing.T) {
 
 func TestUpdateProductHandler_Valid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	// First, create a product
-	createBody := httpdelivery.ProductRequest{Name: "Old Name", Price: 100.0, Quantity: 1}
+	createBody := api.ProductRequest{Name: "Old Name", Price: 100.0, Quantity: 1}
 	jsonCreateBody, _ := json.Marshal(createBody)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody))
 	createReq.Header.Set("Authorization", "Bearer "+token)
@@ -234,13 +242,13 @@ func TestUpdateProductHandler_Valid(t *testing.T) {
 		t.Fatalf("expected 201 Created, got %d", createW.Code)
 	}
 
-	var created httpdelivery.ProductResponse
+	var created api.ProductResponse
 	if err := json.NewDecoder(createW.Body).Decode(&created); err != nil {
 		t.Fatalf("error decoding create response: %v", err)
 	}
 
 	// Now update the product
-	updateBody := httpdelivery.ProductRequest{Name: "New Name", Price: 200.0, Quantity: 2}
+	updateBody := api.ProductRequest{Name: "New Name", Price: 200.0, Quantity: 2}
 	jsonUpdateBody, _ := json.Marshal(updateBody)
 	updateReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", created.Id), bytes.NewReader(jsonUpdateBody))
 	updateReq.Header.Set("Authorization", "Bearer "+token)
@@ -251,7 +259,7 @@ func TestUpdateProductHandler_Valid(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d", updateW.Code)
 	}
 
-	var updated httpdelivery.ProductResponse
+	var updated api.ProductResponse
 	if err := json.NewDecoder(updateW.Body).Decode(&updated); err != nil {
 		t.Fatalf("error decoding update response: %v", err)
 	}
@@ -268,8 +276,8 @@ func TestUpdateProductHandler_Valid(t *testing.T) {
 }
 
 func TestUpdateProductHandler_NotFound(t *testing.T) {
-	r := httpdelivery.NewRouter()
-	updateBody := httpdelivery.ProductRequest{Name: "Ghost", Price: 1.0}
+	r := api.NewRouter()
+	updateBody := api.ProductRequest{Name: "Ghost", Price: 1.0}
 	jsonBody, _ := json.Marshal(updateBody)
 	req := httptest.NewRequest(http.MethodPut, "/products/999999", bytes.NewReader(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -282,7 +290,7 @@ func TestUpdateProductHandler_NotFound(t *testing.T) {
 }
 
 func TestUpdateProductHandler_InvalidInput(t *testing.T) {
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 	invalidJSON := `{Name: "Bad" Price: 999}` // missing comma
 	req := httptest.NewRequest(http.MethodPut, "/products/1", bytes.NewBufferString(invalidJSON))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -296,9 +304,9 @@ func TestUpdateProductHandler_InvalidInput(t *testing.T) {
 
 func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 	// Create valid product
-	createBody := httpdelivery.ProductRequest{Name: "Temporary", Price: 100.0, Quantity: 1}
+	createBody := api.ProductRequest{Name: "Temporary", Price: 100.0, Quantity: 1}
 	jsonCreateBody, _ := json.Marshal(createBody)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody))
 	createReq.Header.Set("Authorization", "Bearer "+token)
@@ -307,11 +315,11 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 	if createW.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created, got %d", createW.Code)
 	}
-	var created httpdelivery.ProductResponse
+	var created api.ProductResponse
 	json.NewDecoder(createW.Body).Decode(&created)
 
 	// Try invalid update
-	invalidUpdate := httpdelivery.ProductRequest{Name: "", Price: -100, Quantity: -1}
+	invalidUpdate := api.ProductRequest{Name: "", Price: -100, Quantity: -1}
 	jsonInvalid, _ := json.Marshal(invalidUpdate)
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", created.Id), bytes.NewReader(jsonInvalid))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -340,9 +348,9 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 
 func TestFilterProductsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 	// Seed test data
-	products := []httpdelivery.ProductRequest{
+	products := []api.ProductRequest{
 		{Name: "Phone", Price: 699.99, Quantity: 10},
 		{Name: "Laptop", Price: 1299.99, Quantity: 5},
 		{Name: "Mouse", Price: 29.99, Quantity: 50},
@@ -368,7 +376,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsSearchResult
+		var resp api.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		if len(resp.Data) != 1 || !strings.Contains(strings.ToLower(resp.Data[0].Name), "phone") {
 			t.Errorf("expected one product containing 'phone', got %v", resp.Data)
@@ -383,7 +391,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsSearchResult
+		var resp api.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		for _, p := range resp.Data {
 			price := p.Price
@@ -401,7 +409,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsSearchResult
+		var resp api.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		for _, p := range resp.Data {
 			qty := p.Quantity
@@ -419,7 +427,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsSearchResult
+		var resp api.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		if got := len(resp.Data); got != 0 {
 			t.Errorf("expected empty result, got %d items", got)
@@ -434,7 +442,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsSearchResult
+		var resp api.ProductsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}
@@ -451,7 +459,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductsSearchResult
+		var resp api.ProductsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}
@@ -463,9 +471,9 @@ func TestFilterProductsHandler(t *testing.T) {
 
 func TestAdjustQuantityHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 	// Create a product
-	create := httpdelivery.ProductRequest{Name: "InventoryItem", Price: 10.0, Quantity: 10}
+	create := api.ProductRequest{Name: "InventoryItem", Price: 10.0, Quantity: 10}
 	body, _ := json.Marshal(create)
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -474,11 +482,11 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created httpdelivery.ProductRequest
+	var created api.ProductRequest
 	json.NewDecoder(w.Body).Decode(&created)
 
 	t.Run("Increase quantity", func(t *testing.T) {
-		adj := httpdelivery.QuantityAdjustmentRequest{Delta: 5}
+		adj := api.QuantityAdjustmentRequest{Delta: 5}
 		body, _ := json.Marshal(adj)
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -488,7 +496,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductResponse
+		var resp api.ProductResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 		if resp.Quantity != 15 {
 			t.Errorf("expected quantity 15, got %v", resp.Quantity)
@@ -496,7 +504,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Decrease quantity", func(t *testing.T) {
-		adj := httpdelivery.QuantityAdjustmentRequest{Delta: -3}
+		adj := api.QuantityAdjustmentRequest{Delta: -3}
 		body, _ := json.Marshal(adj)
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -506,7 +514,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp httpdelivery.ProductResponse
+		var resp api.ProductResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 		if resp.Quantity != 12.0 {
 			t.Errorf("expected quantity 12, got %v", resp.Quantity)
@@ -514,7 +522,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Too much decrease (underflow)", func(t *testing.T) {
-		adj := httpdelivery.QuantityAdjustmentRequest{Delta: -100}
+		adj := api.QuantityAdjustmentRequest{Delta: -100}
 		body, _ := json.Marshal(adj)
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -527,7 +535,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Invalid ID", func(t *testing.T) {
-		adj := httpdelivery.QuantityAdjustmentRequest{Delta: 1}
+		adj := api.QuantityAdjustmentRequest{Delta: 1}
 		body, _ := json.Marshal(adj)
 		req := httptest.NewRequest(http.MethodPost, "/products/abc/adjust", bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -553,10 +561,10 @@ func TestAdjustQuantityHandler(t *testing.T) {
 
 func TestGetMovementsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	// Create a product
-	product := httpdelivery.ProductRequest{Name: "Box", Price: 50.0, Quantity: 10}
+	product := api.ProductRequest{Name: "Box", Price: 50.0, Quantity: 10}
 	body, _ := json.Marshal(product)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
 	createReq.Header.Set("Authorization", "Bearer "+token)
@@ -565,12 +573,12 @@ func TestGetMovementsHandler(t *testing.T) {
 	if createW.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created httpdelivery.ProductResponse
+	var created api.ProductResponse
 	json.NewDecoder(createW.Body).Decode(&created)
 
 	// Adjust quantity twice to generate movement log
 	adjust := func(delta int) {
-		adj := httpdelivery.QuantityAdjustmentRequest{Delta: delta}
+		adj := api.QuantityAdjustmentRequest{Delta: delta}
 		body, _ := json.Marshal(adj)
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -592,7 +600,7 @@ func TestGetMovementsHandler(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var movementsCollection httpdelivery.MovementsSearchResult
+		var movementsCollection api.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -620,7 +628,7 @@ func TestGetMovementsHandler(t *testing.T) {
 			t.Errorf("expected 400 Not Found, got %d", w.Code)
 		}
 
-		var movements httpdelivery.MovementsSearchResult
+		var movements api.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&movements)
 		if count := movements.Meta.TotalCount; count != 0 {
 			t.Errorf("expected 0 movements, got %d", count)
@@ -630,10 +638,10 @@ func TestGetMovementsHandler(t *testing.T) {
 
 func TestGetMovementsHandler_Filtering(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	// Create a product
-	create := httpdelivery.ProductRequest{Name: "FilterBox", Price: 80.0, Quantity: 10}
+	create := api.ProductRequest{Name: "FilterBox", Price: 80.0, Quantity: 10}
 	jsonCreate, _ := json.Marshal(create)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreate))
 	createReq.Header.Set("Authorization", "Bearer "+token)
@@ -642,14 +650,14 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 	if createW.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created httpdelivery.ProductResponse
+	var created api.ProductResponse
 	json.NewDecoder(createW.Body).Decode(&created)
 
 	// First adjustment: backdated (manually insert)
 	movementRepo.AddMovement(created.Id, 5, time.Now().Add(-48*time.Hour).UTC())
 
 	// Second adjustment: recent
-	adj := httpdelivery.MovementResponse{Delta: 2}
+	adj := api.MovementResponse{Delta: 2}
 	jsonAdj, _ := json.Marshal(adj)
 	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(jsonAdj))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -665,7 +673,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection httpdelivery.MovementsSearchResult
+		var movementsCollection api.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -680,7 +688,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection httpdelivery.MovementsSearchResult
+		var movementsCollection api.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -696,7 +704,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection httpdelivery.MovementsSearchResult
+		var movementsCollection api.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -712,7 +720,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection httpdelivery.MovementsSearchResult
+		var movementsCollection api.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -724,10 +732,10 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 
 func TestGetMovementsHandler_Pagination(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	// Create a product
-	create := httpdelivery.ProductRequest{Name: "PagedWidget", Price: 20.0, Quantity: 5}
+	create := api.ProductRequest{Name: "PagedWidget", Price: 20.0, Quantity: 5}
 	jsonCreate, _ := json.Marshal(create)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreate))
 	createReq.Header.Set("Authorization", "Bearer "+token)
@@ -736,13 +744,13 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 	if createW.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created httpdelivery.ProductResponse
+	var created api.ProductResponse
 	json.NewDecoder(createW.Body).Decode(&created)
 
 	// Generate 3 movements
 	deltas := []int{+1, -1, +2}
 	for _, d := range deltas {
-		adj := httpdelivery.QuantityAdjustmentRequest{Delta: d}
+		adj := api.QuantityAdjustmentRequest{Delta: d}
 		b, _ := json.Marshal(adj)
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(b))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -762,7 +770,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp httpdelivery.MovementsSearchResult
+		var resp api.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 
 		if resp.Meta.TotalCount == 0 {
@@ -783,7 +791,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp httpdelivery.MovementsSearchResult
+		var resp api.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		if count := len(resp.Data); count != 2 {
 			t.Errorf("expected 2 items, got %d", count)
@@ -799,7 +807,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp httpdelivery.MovementsSearchResult
+		var resp api.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		items := resp.Data
 		if len(items) != 1 {
@@ -810,10 +818,10 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 
 func TestExportMovementsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	// Create a product
-	product := httpdelivery.ProductRequest{Name: "Exportable", Price: 100.0, Quantity: 5}
+	product := api.ProductRequest{Name: "Exportable", Price: 100.0, Quantity: 5}
 	b, _ := json.Marshal(product)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
 	createReq.Header.Set("Authorization", "Bearer "+token)
@@ -822,11 +830,11 @@ func TestExportMovementsHandler(t *testing.T) {
 	if createW.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created httpdelivery.ProductResponse
+	var created api.ProductResponse
 	json.NewDecoder(createW.Body).Decode(&created)
 
 	// Add 1 movement
-	adj := httpdelivery.QuantityAdjustmentRequest{Delta: 3}
+	adj := api.QuantityAdjustmentRequest{Delta: 3}
 	body, _ := json.Marshal(adj)
 	adjReq := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 	adjReq.Header.Set("Authorization", "Bearer "+token)
@@ -885,10 +893,10 @@ func TestExportMovementsHandler(t *testing.T) {
 
 func TestExportMovementsHandler_Filtered(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	// Create a product
-	create := httpdelivery.ProductRequest{Name: "FilteredExport", Price: 75.0, Quantity: 8}
+	create := api.ProductRequest{Name: "FilteredExport", Price: 75.0, Quantity: 8}
 	jsonCreate, _ := json.Marshal(create)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreate))
 	createReq.Header.Set("Authorization", "Bearer "+token)
@@ -897,14 +905,14 @@ func TestExportMovementsHandler_Filtered(t *testing.T) {
 	if createW.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created httpdelivery.ProductResponse
+	var created api.ProductResponse
 	json.NewDecoder(createW.Body).Decode(&created)
 
 	// Insert one old movement
 	movementRepo.AddMovement(created.Id, -1, time.Now().Add(-72*time.Hour).UTC())
 
 	// Insert one recent movement via API
-	adj := httpdelivery.QuantityAdjustmentRequest{Delta: 2}
+	adj := api.QuantityAdjustmentRequest{Delta: 2}
 	body, _ := json.Marshal(adj)
 	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -950,7 +958,7 @@ func TestExportMovementsHandler_Filtered(t *testing.T) {
 }
 
 func TestAuthFlow(t *testing.T) {
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 
 	t.Run("Login with valid credentials", func(t *testing.T) {
 		payload := map[string]string{"username": "admin", "password": "secret"}
@@ -1011,16 +1019,86 @@ func TestAuthFlow(t *testing.T) {
 	})
 }
 
+func TestRegisterHandler(t *testing.T) {
+	r := api.NewRouter()
+
+	t.Run("Valid registration returns token", func(t *testing.T) {
+		data := map[string]string{
+			"username": "testuser",
+			"password": "strongpassword",
+		}
+		body, _ := json.Marshal(data)
+		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d", w.Code)
+		}
+		var resp map[string]string
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if resp["token"] == "" {
+			t.Error("expected token in response")
+		}
+	})
+
+	t.Run("Duplicate username returns 409", func(t *testing.T) {
+		data := map[string]string{
+			"username": "testuser", // same as above
+			"password": "anotherpass",
+		}
+		body, _ := json.Marshal(data)
+		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusConflict {
+			t.Fatalf("expected 409 Conflict, got %d", w.Code)
+		}
+	})
+
+	t.Run("Too short password returns 400", func(t *testing.T) {
+		data := map[string]string{
+			"username": "shortpass",
+			"password": "123",
+		}
+		body, _ := json.Marshal(data)
+		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+
+	t.Run("Malformed JSON returns 400", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(`{invalid`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+}
+
 // clearAllProducts removes all products using the HTTP API endpoints.
 func clearAllProducts() {
-	r := httpdelivery.NewRouter()
+	r := api.NewRouter()
 	getReq := httptest.NewRequest(http.MethodGet, "/products", nil)
 	getW := httptest.NewRecorder()
 	r.ServeHTTP(getW, getReq)
 	if getW.Code != http.StatusOK {
 		return // nothing to clear or error
 	}
-	var products []httpdelivery.ProductResponse
+	var products []api.ProductResponse
 	if err := json.NewDecoder(getW.Body).Decode(&products); err != nil {
 		return
 	}

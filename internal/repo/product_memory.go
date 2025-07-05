@@ -13,6 +13,14 @@ type InMemoryProductRepository struct {
 	nextID   int
 }
 
+// NewInMemoryProductRepository creates a new instance of InMemoryProductRepository.
+func NewInMemoryProductRepository() *InMemoryProductRepository {
+	return &InMemoryProductRepository{
+		products: []models.Product{},
+		nextID:   1,
+	}
+}
+
 // Filter implements ProductRepository.
 func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, int, error) {
 	var filtered []models.Product
@@ -52,14 +60,6 @@ func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *floa
 	}
 
 	return filtered[start:end], len(filtered), nil
-}
-
-// NewInMemoryProductRepository creates a new instance of InMemoryProductRepository.
-func NewInMemoryProductRepository() *InMemoryProductRepository {
-	return &InMemoryProductRepository{
-		products: []models.Product{},
-		nextID:   1,
-	}
 }
 
 // Create adds a new product to the repository.
