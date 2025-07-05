@@ -558,6 +558,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := userRepo.GetByUsername(creds.Username)
+
 	if err != nil {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
@@ -579,4 +580,44 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 func SetUserRepo(r repo.UserRepository) {
 	userRepo = r
+}
+
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	var creds struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		http.Error(w, "invalid input", http.StatusBadRequest)
+		return
+	}
+
+	if len(creds.Username) < 3 || len(creds.Password) < 6 {
+		http.Error(w, "username or password too short", http.StatusBadRequest)
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(creds.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "failed to hash password", http.StatusInternalServerError)
+		return
+	}
+
+	user := models.User{
+		Username:     creds.Username,
+		PasswordHash: string(hashed),
+	}
+
+	_, err = userRepo.CreateUser(user)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			http.Error(w, "username already exists", http.StatusConflict)
+		} else {
+			http.Error(w, "failed to register user", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "user registered"})
 }

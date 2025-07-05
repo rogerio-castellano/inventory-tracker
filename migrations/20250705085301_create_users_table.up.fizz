@@ -2,4 +2,6 @@ create_table("users") {
   t.Column("id", "integer", {primary: true})
   t.Column("username", "string", {})
   t.Column("password_hash", "string", {})
+  t.Column("created_at", "timestamp", {"default": "now()"})
+  t.Column("updated_at", "timestamp", {"default": "now()"})
 }

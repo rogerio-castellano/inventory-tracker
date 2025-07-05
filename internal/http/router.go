@@ -20,6 +20,7 @@ func NewRouter() http.Handler {
 	r.Get("/products/{id}/movements/export", ExportMovementsHandler)
 
 	r.Post("/login", LoginHandler)
+	r.Post("/register", RegisterHandler)
 
 	r.Group(func(protected chi.Router) {
 		protected.Use(AuthMiddleware)

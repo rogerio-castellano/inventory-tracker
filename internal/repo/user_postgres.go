@@ -11,6 +11,7 @@ import (
 
 type UserRepository interface {
 	GetByUsername(username string) (models.User, error)
+	CreateUser(u models.User) (models.User, error)
 }
 
 type PostgresUserRepository struct {
@@ -36,3 +37,15 @@ func (r *PostgresUserRepository) GetByUsername(username string) (models.User, er
 }
 
 var ErrUserNotFound = errors.New("user not found")
+
+func (r *PostgresUserRepository) CreateUser(u models.User) (models.User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	query := `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id`
+	err := r.db.QueryRowContext(ctx, query, u.Username, u.PasswordHash).Scan(&u.ID)
+	if err != nil {
+		return models.User{}, err
+	}
+	return u, nil
+}
