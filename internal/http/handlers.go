@@ -618,6 +618,16 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate a token for the new user
+	token, err := auth.GenerateToken(user.ID, user.Username)
+	if err != nil {
+		http.Error(w, "failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "user registered"})
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "user registered",
+		"token":   token,
+	})
 }
