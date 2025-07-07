@@ -1,5 +1,5 @@
 @url=http://localhost:8080
-@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE3NDUwNTAsInN1YiI6MSwidXNlcm5hbWUiOiJhZG1pbiJ9.li5sJwXz6lC1ucwzwYnTNsA56Uv4k79ZHyV0jnzCMJ8
+@token=
 
 # Login with valid credentials
 POST {{url}}/login HTTP/1.1
@@ -89,7 +89,7 @@ Content-Type: application/json
 
 ###
 POST http://localhost:8080/products/import
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE4OTUwMjUsInN1YiI6MSwidXNlcm5hbWUiOiJhZG1pbiJ9.g_aYnOnXnbYqVWurZrLWd6nW540HtDYpJbJ0OylU4tY
+Authorization: Bearer {{token}}
 Content-Type: multipart/form-data; boundary=boundary
 
 --boundary
@@ -98,3 +98,5 @@ Content-Type: text/csv
 
 < ./products.csv
 --boundary--
+
+

@@ -698,6 +698,13 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// Check if product with same name exists
+		existing, err := productRepo.GetByName(name)
+		if err == nil && existing.ID != 0 {
+			errorsList = append(errorsList, fmt.Sprintf("row %d: product '%s' already exists", row, name))
+			continue
+		}
+
 		product := models.Product{
 			Name:      name,
 			Price:     price,

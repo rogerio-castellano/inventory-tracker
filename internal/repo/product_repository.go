@@ -15,6 +15,7 @@ type ProductRepository interface {
 	Delete(id int) error
 	Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, int, error)
 	AdjustQuantity(productId int, delta int) (models.Product, error)
+	GetByName(name string) (models.Product, error)
 }
 
 var ErrInvalidQuantityChange = errors.New("insufficient quantity or product not found")

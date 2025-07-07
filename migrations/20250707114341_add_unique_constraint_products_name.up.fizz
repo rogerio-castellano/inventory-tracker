@@ -1,0 +1,1 @@
+add_index("products", "name", {"name": "unique_product_name", "unique": true})

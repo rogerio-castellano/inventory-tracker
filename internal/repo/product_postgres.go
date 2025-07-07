@@ -195,3 +195,17 @@ func (r *PostgresProductRepository) AdjustQuantity(productID int, delta int) (mo
 	}
 	return p, err
 }
+
+func (r *PostgresProductRepository) GetByName(name string) (models.Product, error) {
+	query := `SELECT id, name, price, quantity, threshold, created_at, updated_at FROM products WHERE name = $1`
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var p models.Product
+	err := r.db.QueryRowContext(ctx, query, name).Scan(
+		&p.ID, &p.Name, &p.Price, &p.Quantity, &p.Threshold, &p.CreatedAt, &p.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return models.Product{}, ErrProductNotFound
+	}
+	return p, err
+}

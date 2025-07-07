@@ -128,3 +128,12 @@ func (r *InMemoryProductRepository) AdjustQuantity(productId int, delta int) (mo
 
 	return models.Product{}, ErrProductNotFound
 }
+
+func (r *InMemoryProductRepository) GetByName(name string) (models.Product, error) {
+	for _, p := range r.products {
+		if p.Name == name {
+			return p, nil
+		}
+	}
+	return models.Product{}, ErrProductNotFound
+}
