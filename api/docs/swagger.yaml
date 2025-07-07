@@ -1,0 +1,539 @@
+basePath: /
+definitions:
+  http.Meta:
+    properties:
+      total_count:
+        type: integer
+    type: object
+  http.MovementResponse:
+    properties:
+      created_at:
+        type: string
+      delta:
+        type: integer
+      id:
+        type: integer
+      product_id:
+        type: integer
+    type: object
+  http.MovementsSearchResult:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/http.MovementResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/http.Meta'
+    type: object
+  http.ProductRequest:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      price:
+        type: number
+      quantity:
+        type: integer
+      threshold:
+        type: integer
+    type: object
+  http.ProductResponse:
+    properties:
+      id:
+        type: integer
+      low_stock:
+        type: boolean
+      name:
+        type: string
+      price:
+        type: number
+      quantity:
+        type: integer
+      threshold:
+        type: integer
+    type: object
+  http.ProductsSearchResult:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/http.ProductResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/http.Meta'
+    type: object
+  http.QuantityAdjustmentRequest:
+    properties:
+      delta:
+        description: can be positive or negative
+        type: integer
+    type: object
+  repo.Metrics:
+    properties:
+      average_price:
+        type: number
+      low_stock_count:
+        type: integer
+      most_moved_product:
+        $ref: '#/definitions/repo.MostMovedProduct'
+      top_5_movers:
+        items:
+          $ref: '#/definitions/repo.TopMover'
+        type: array
+      total_movements:
+        type: integer
+      total_products:
+        type: integer
+      total_quantity:
+        type: integer
+      total_stock_value:
+        type: number
+    type: object
+  repo.MostMovedProduct:
+    properties:
+      movement_count:
+        type: integer
+      name:
+        type: string
+    type: object
+  repo.TopMover:
+    properties:
+      count:
+        type: integer
+      name:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API for managing inventory products and stock movements.
+  title: Inventory Tracker API
+  version: "1.0"
+paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: username and password
+        in: body
+        name: credentials
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Authenticate user and return JWT token
+      tags:
+      - auth
+  /metrics/dashboard:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repo.Metrics'
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: Dashboard metrics for admin view
+      tags:
+      - metrics
+  /products:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/http.ProductResponse'
+            type: array
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: List all products
+      tags:
+      - products
+    post:
+      consumes:
+      - application/json
+      description: Adds a product to the inventory
+      parameters:
+      - description: Product to add
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/http.ProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/http.ProductResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new product
+      tags:
+      - products
+  /products/{id}:
+    delete:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: Deleted successfully
+        "400":
+          description: Invalid ID
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: Delete a product
+      tags:
+      - products
+    get:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.ProductResponse'
+        "400":
+          description: Invalid ID
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: Get product by ID
+      tags:
+      - products
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated product
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/http.ProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.ProductResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: Update a product
+      tags:
+      - products
+  /products/{id}/adjust:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Quantity change
+        in: body
+        name: adjustment
+        required: true
+        schema:
+          $ref: '#/definitions/http.QuantityAdjustmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.ProductResponse'
+        "400":
+          description: Invalid adjustment
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: Adjust quantity of a product
+      tags:
+      - inventory
+  /products/{id}/movements:
+    get:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Filter movements from this timestamp (RFC3339)
+        in: query
+        name: since
+        type: string
+      - description: Filter movements until this timestamp (RFC3339)
+        in: query
+        name: until
+        type: string
+      - description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: Limit for pagination
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.MovementsSearchResult'
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "404":
+          description: Product not found
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: Get product movement logs
+      tags:
+      - movements
+  /products/{id}/movements/export:
+    get:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Export format (csv or json)
+        in: query
+        name: format
+        required: true
+        type: string
+      - description: Filter from timestamp (RFC3339)
+        in: query
+        name: since
+        type: string
+      - description: Filter until timestamp (RFC3339)
+        in: query
+        name: until
+        type: string
+      produces:
+      - text/csv
+      - ' application/json'
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: Export product movement logs
+      tags:
+      - movements
+  /products/import:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: CSV file
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Import mode (skip|update)
+        in: query
+        name: mode
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid file
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: Import products via CSV
+      tags:
+      - import
+  /products/search:
+    get:
+      parameters:
+      - description: Filter by name
+        in: query
+        name: name
+        type: string
+      - description: Minimum price
+        in: query
+        name: minPrice
+        type: number
+      - description: Maximum price
+        in: query
+        name: maxPrice
+        type: number
+      - description: Minimum quantity
+        in: query
+        name: minQty
+        type: integer
+      - description: Maximum quantity
+        in: query
+        name: maxQty
+        type: integer
+      - description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: Limit for pagination
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.ProductsSearchResult'
+        "400":
+          description: Invalid query
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      summary: Filter and paginate products
+      tags:
+      - products
+  /register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: username and password
+        in: body
+        name: credentials
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "409":
+          description: User exists
+          schema:
+            type: string
+      summary: Register new user and return JWT token
+      tags:
+      - auth
+swagger: "2.0"

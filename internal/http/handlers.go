@@ -18,8 +18,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var userRepo repo.UserRepository
-
 type ProductRequest struct {
 	Id        int     `json:"id,omitempty"`
 	Name      string  `json:"name"`
@@ -34,7 +32,7 @@ type ProductResponse struct {
 	Price     float64 `json:"price"`
 	Quantity  int     `json:"quantity"`
 	Threshold int     `json:"threshold"`
-	LowStock  bool    `json:"low_stock,omitempty"` // Optional field to indicate low stock
+	LowStock  bool    `json:"low_stock,omitempty"`
 }
 
 type Meta struct {
@@ -62,6 +60,16 @@ type MovementsSearchResult struct {
 	Meta Meta               `json:"meta,omitempty"`
 }
 
+// CreateProductHandler godoc
+// @Summary Create a new product
+// @Description Adds a product to the inventory
+// @Tags products
+// @Accept json
+// @Produce json
+// @Param product body http.ProductRequest true "Product to add"
+// @Success 201 {object} http.ProductResponse
+// @Failure 400 {object} map[string]string
+// @Router /products [post]
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	var req ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -106,6 +114,13 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// GetProductsHandler godoc
+// @Summary List all products
+// @Tags products
+// @Produce json
+// @Success 200 {array} ProductResponse
+// @Failure 500 {string} string "Internal error"
+// @Router /products [get]
 func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
 	products, err := productRepo.GetAll()
 	if err != nil {
@@ -127,6 +142,16 @@ func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// GetProductByIDHandler godoc
+// @Summary Get product by ID
+// @Tags products
+// @Produce json
+// @Param id path int true "Product ID"
+// @Success 200 {object} ProductResponse
+// @Failure 400 {string} string "Invalid ID"
+// @Failure 404 {string} string "Not found"
+// @Failure 500 {string} string "Internal error"
+// @Router /products/{id} [get]
 func GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -156,6 +181,15 @@ func GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// DeleteProductHandler godoc
+// @Summary Delete a product
+// @Tags products
+// @Param id path int true "Product ID"
+// @Success 204 "Deleted successfully"
+// @Failure 400 {string} string "Invalid ID"
+// @Failure 404 {string} string "Not found"
+// @Failure 500 {string} string "Internal error"
+// @Router /products/{id} [delete]
 func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id") // Use chi to get the path parameter
 	if idStr == "" {
@@ -178,6 +212,18 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// UpdateProductHandler godoc
+// @Summary Update a product
+// @Tags products
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Param product body ProductRequest true "Updated product"
+// @Success 200 {object} ProductResponse
+// @Failure 400 {object} map[string]any
+// @Failure 404 {string} string "Not found"
+// @Failure 500 {string} string "Internal error"
+// @Router /products/{id} [put]
 func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -231,6 +277,21 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// FilterProductsHandler godoc
+// @Summary Filter and paginate products
+// @Tags products
+// @Produce json
+// @Param name query string false "Filter by name"
+// @Param minPrice query number false "Minimum price"
+// @Param maxPrice query number false "Maximum price"
+// @Param minQty query int false "Minimum quantity"
+// @Param maxQty query int false "Maximum quantity"
+// @Param offset query int false "Offset for pagination"
+// @Param limit query int false "Limit for pagination"
+// @Success 200 {object} ProductsSearchResult
+// @Failure 400 {string} string "Invalid query"
+// @Failure 500 {string} string "Internal error"
+// @Router /products/search [get]
 func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
@@ -316,6 +377,18 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// AdjustQuantityHandler godoc
+// @Summary Adjust quantity of a product
+// @Tags inventory
+// @Accept json
+// @Produce json
+// @Param id path int true "Product ID"
+// @Param adjustment body QuantityAdjustmentRequest true "Quantity change"
+// @Success 200 {object} ProductResponse
+// @Failure 400 {string} string "Invalid adjustment"
+// @Failure 404 {string} string "Not found"
+// @Failure 500 {string} string "Internal error"
+// @Router /products/{id}/adjust [post]
 func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -362,6 +435,20 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// GetMovementsHandler godoc
+// @Summary Get product movement logs
+// @Tags movements
+// @Produce json
+// @Param id path int true "Product ID"
+// @Param since query string false "Filter movements from this timestamp (RFC3339)"
+// @Param until query string false "Filter movements until this timestamp (RFC3339)"
+// @Param offset query int false "Offset for pagination"
+// @Param limit query int false "Limit for pagination"
+// @Success 200 {object} MovementsSearchResult
+// @Failure 400 {string} string "Invalid input"
+// @Failure 404 {string} string "Product not found"
+// @Failure 500 {string} string "Internal error"
+// @Router /products/{id}/movements [get]
 func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -488,6 +575,18 @@ func validateProduct(p ProductRequest) map[string]string {
 	return errs
 }
 
+// ExportMovementsHandler godoc
+// @Summary Export product movement logs
+// @Tags movements
+// @Produce text/csv, application/json
+// @Param id path int true "Product ID"
+// @Param format query string true "Export format (csv or json)"
+// @Param since query string false "Filter from timestamp (RFC3339)"
+// @Param until query string false "Filter until timestamp (RFC3339)"
+// @Success 200 {file} file
+// @Failure 400 {string} string "Invalid input"
+// @Failure 500 {string} string "Internal error"
+// @Router /products/{id}/movements/export [get]
 func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -554,6 +653,18 @@ func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+var userRepo repo.UserRepository
+
+// LoginHandler godoc
+// @Summary Authenticate user and return JWT token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param credentials body map[string]string true "username and password"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "Invalid input"
+// @Failure 401 {string} string "Unauthorized"
+// @Router /login [post]
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var creds struct {
 		Username string `json:"username"`
@@ -589,6 +700,16 @@ func SetUserRepo(r repo.UserRepository) {
 	userRepo = r
 }
 
+// RegisterHandler godoc
+// @Summary Register new user and return JWT token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param credentials body map[string]string true "username and password"
+// @Success 201 {object} map[string]string
+// @Failure 400 {string} string "Invalid input"
+// @Failure 409 {string} string "User exists"
+// @Router /register [post]
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var creds struct {
 		Username string `json:"username"`
@@ -641,6 +762,13 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 var metricsRepo repo.MetricsRepository
 
+// GetDashboardMetricsHandler godoc
+// @Summary Dashboard metrics for admin view
+// @Tags metrics
+// @Produce json
+// @Success 200 {object} repo.Metrics
+// @Failure 500 {string} string "Internal error"
+// @Router /metrics/dashboard [get]
 func SetMetricsRepo(r repo.MetricsRepository) {
 	metricsRepo = r
 }
@@ -655,6 +783,17 @@ func GetDashboardMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(m)
 }
 
+// ImportProductsHandler godoc
+// @Summary Import products via CSV
+// @Tags import
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "CSV file"
+// @Param mode query string false "Import mode (skip|update)"
+// @Success 200 {object} map[string]any
+// @Failure 400 {string} string "Invalid file"
+// @Failure 500 {string} string "Internal error"
+// @Router /products/import [post]
 func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 	mode := strings.ToLower(r.URL.Query().Get("mode"))
 	if mode != "update" {
