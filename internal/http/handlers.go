@@ -3,6 +3,8 @@ package http
 import (
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -651,4 +653,71 @@ func GetDashboardMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(m)
+}
+
+func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "missing file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	headers, err := reader.Read()
+	if err != nil {
+		http.Error(w, "invalid CSV header", http.StatusBadRequest)
+		return
+	}
+
+	headerIndex := map[string]int{}
+	for i, h := range headers {
+		headerIndex[strings.ToLower(h)] = i
+	}
+
+	var imported int
+	var errorsList []string
+
+	for row := 2; ; row++ {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			errorsList = append(errorsList, fmt.Sprintf("row %d: %v", row, err))
+			continue
+		}
+
+		name := record[headerIndex["name"]]
+		price, _ := strconv.ParseFloat(record[headerIndex["price"]], 64)
+		quantity, _ := strconv.Atoi(record[headerIndex["quantity"]])
+		threshold, _ := strconv.Atoi(record[headerIndex["threshold"]])
+
+		if strings.TrimSpace(name) == "" || price <= 0 || quantity < 0 || threshold < 0 {
+			errorsList = append(errorsList, fmt.Sprintf("row %d: invalid values", row))
+			continue
+		}
+
+		product := models.Product{
+			Name:      name,
+			Price:     price,
+			Quantity:  quantity,
+			Threshold: threshold,
+			CreatedAt: time.Now().Format(time.RFC3339),
+			UpdatedAt: time.Now().Format(time.RFC3339),
+		}
+
+		_, err = productRepo.Create(product)
+		if err != nil {
+			errorsList = append(errorsList, fmt.Sprintf("row %d: %v", row, err))
+			continue
+		}
+		imported++
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"imported": imported,
+		"errors":   errorsList,
+	})
 }

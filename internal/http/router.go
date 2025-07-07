@@ -30,6 +30,7 @@ func NewRouter() http.Handler {
 		protected.Put("/products/{id}", UpdateProductHandler)
 		protected.Delete("/products/{id}", DeleteProductHandler)
 		protected.Post("/products/{id}/adjust", AdjustQuantityHandler)
+		protected.Post("/products/import", ImportProductsHandler)
 	})
 
 	return r
