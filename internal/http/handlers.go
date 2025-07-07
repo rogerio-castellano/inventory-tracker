@@ -656,6 +656,11 @@ func GetDashboardMetricsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
+	mode := strings.ToLower(r.URL.Query().Get("mode"))
+	if mode != "update" {
+		mode = "skip" // default
+	}
+
 	file, _, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "missing file", http.StatusBadRequest)
@@ -701,7 +706,24 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 		// Check if product with same name exists
 		existing, err := productRepo.GetByName(name)
 		if err == nil && existing.ID != 0 {
-			errorsList = append(errorsList, fmt.Sprintf("row %d: product '%s' already exists", row, name))
+			if mode == "skip" {
+				errorsList = append(errorsList, fmt.Sprintf("row %d: product '%s' already exists", row, name))
+				continue
+			}
+		}
+
+		if mode == "update" {
+			existing.Price = price
+			existing.Quantity = quantity
+			existing.Threshold = threshold
+			existing.UpdatedAt = time.Now().Format(time.RFC3339)
+
+			_, err = productRepo.Update(existing)
+			if err != nil {
+				errorsList = append(errorsList, fmt.Sprintf("row %d: failed to update '%s'", row, name))
+				continue
+			}
+			imported++
 			continue
 		}
 
