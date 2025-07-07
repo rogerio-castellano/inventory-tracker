@@ -54,6 +54,26 @@ func setupTestRepo(testPassword string) {
 	metricsRepo.SetRepositories(productRepo, movementRepo)
 }
 
+func clearAllProducts() {
+	productRepo.Clear()
+}
+
+func generateToken(r http.Handler, username, password string) (string, error) {
+	payload := map[string]string{"username": username, "password": password}
+	body, _ := json.Marshal(payload)
+	loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	var resp map[string]string
+	err := json.NewDecoder(loginW.Body).Decode(&resp)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode token response: %v", err)
+	}
+
+	return resp["token"], nil
+}
+
 func TestCreateProductHandler_Valid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
@@ -943,7 +963,7 @@ func TestExportMovementsHandler_Filtered(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var items []map[string]any
+		var items []models.Movement
 		if err := json.NewDecoder(w.Body).Decode(&items); err != nil {
 			t.Fatalf("failed to decode json: %v", err)
 		}
@@ -993,7 +1013,7 @@ func TestAuthFlow(t *testing.T) {
 	})
 
 	t.Run("Protected route without token is rejected", func(t *testing.T) {
-		product := map[string]any{"name": "AuthBox", "price": 999.0, "quantity": 1}
+		product := api.ProductRequest{Name: "AuthBox", Price: 999.0, Quantity: 1}
 		b, _ := json.Marshal(product)
 		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
 		w := httptest.NewRecorder()
@@ -1005,7 +1025,6 @@ func TestAuthFlow(t *testing.T) {
 	})
 
 	t.Run("Protected route with valid token succeeds", func(t *testing.T) {
-		// login to get token
 		payload := map[string]string{"username": "admin", "password": "secret"}
 		body, _ := json.Marshal(payload)
 		loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
@@ -1016,8 +1035,7 @@ func TestAuthFlow(t *testing.T) {
 		_ = json.NewDecoder(loginW.Body).Decode(&resp)
 		token := resp["token"]
 
-		// make authorized request
-		product := map[string]any{"name": "SecureProduct", "price": 10.0, "quantity": 2}
+		product := api.ProductRequest{Name: "SecureProduct", Price: 10.0, Quantity: 2}
 		b, _ := json.Marshal(product)
 		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -1115,15 +1133,14 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created map[string]any
+	var created api.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
-	id := int(created["id"].(float64))
 
 	// ❌ Try deducting more than available
 	t.Run("Reject over-deduction", func(t *testing.T) {
 		payload := api.QuantityAdjustmentRequest{Delta: -10}
 		b, _ := json.Marshal(payload)
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(b))
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(b))
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -1149,7 +1166,7 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 				}
 				payload := api.QuantityAdjustmentRequest{Delta: delta}
 				b, _ := json.Marshal(payload)
-				req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(b))
+				req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(b))
 				w := httptest.NewRecorder()
 				r.ServeHTTP(w, req)
 				if w.Code == http.StatusOK {
@@ -1160,15 +1177,13 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 		wg.Wait()
 
 		// Check final state
-		getReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d", id), nil)
+		getReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d", created.Id), nil)
 		getW := httptest.NewRecorder()
 		r.ServeHTTP(getW, getReq)
-		var final map[string]any
+		var final api.ProductResponse
 		json.NewDecoder(getW.Body).Decode(&final)
-		qty := int(final["quantity"].(float64))
-
-		if qty < 0 {
-			t.Errorf("quantity should not go negative, got %d", qty)
+		if final.Quantity < 0 {
+			t.Errorf("quantity should not go negative, got %d", final.Quantity)
 		}
 	})
 }
@@ -1193,15 +1208,14 @@ func TestLowStockAlert(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product: %d", w.Code)
 	}
-	var created map[string]any
+	var created api.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
-	id := int(created["id"].(float64))
 
 	// Adjust to just above threshold (5 → 4) → no alert
 	t.Run("No alert above threshold", func(t *testing.T) {
-		payload := map[string]int{"delta": -1}
+		payload := api.QuantityAdjustmentRequest{Delta: -1}
 		b, _ := json.Marshal(payload)
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(b))
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(b))
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -1210,6 +1224,7 @@ func TestLowStockAlert(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
+		// Must keep dynamic response structure to handle absence of low_stock
 		var resp map[string]any
 		json.NewDecoder(w.Body).Decode(&resp)
 
@@ -1220,9 +1235,10 @@ func TestLowStockAlert(t *testing.T) {
 
 	// Adjust to below threshold (4 → 2) → should trigger alert
 	t.Run("Alert triggered below threshold", func(t *testing.T) {
-		payload := map[string]int{"delta": -2}
+		payload := api.QuantityAdjustmentRequest{Delta: -2}
+
 		b, _ := json.Marshal(payload)
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", id), bytes.NewReader(b))
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(b))
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -1231,34 +1247,13 @@ func TestLowStockAlert(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp map[string]any
+		var resp api.ProductResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 
-		if resp["low_stock"] != true {
+		if resp.LowStock != true {
 			t.Error("expected low_stock alert to be true")
 		}
 	})
-}
-
-// clearAllProducts removes all products using the HTTP API endpoints.
-func clearAllProducts() {
-	productRepo.Clear()
-}
-
-func generateToken(r http.Handler, username, password string) (string, error) {
-	payload := map[string]string{"username": username, "password": password}
-	body, _ := json.Marshal(payload)
-	loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
-	loginW := httptest.NewRecorder()
-	r.ServeHTTP(loginW, loginReq)
-
-	var resp map[string]string
-	err := json.NewDecoder(loginW.Body).Decode(&resp)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode token response: %v", err)
-	}
-
-	return resp["token"], nil
 }
 
 func TestDashboardMetricsHandler(t *testing.T) {
