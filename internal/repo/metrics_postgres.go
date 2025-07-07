@@ -33,5 +33,25 @@ func (r *PostgresMetricsRepository) GetDashboardMetrics() (Metrics, error) {
 		LIMIT 1
 	`).Scan(&m.MostMovedProduct.Name, &m.MostMovedProduct.MovementCount)
 
+	_ = r.db.QueryRowContext(ctx, `SELECT COALESCE(AVG(price), 0) FROM products`).Scan(&m.AveragePrice)
+	_ = r.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(price * quantity), 0) FROM products`).Scan(&m.TotalStockValue)
+	_ = r.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(quantity), 0) FROM products`).Scan(&m.TotalQuantity)
+
+	// Top 5 movers
+	rows, _ := r.db.QueryContext(ctx, `
+			SELECT p.name, COUNT(*) AS cnt
+			FROM movements m
+			JOIN products p ON p.id = m.product_id
+			GROUP BY p.name
+			ORDER BY cnt DESC
+			LIMIT 5
+		`)
+	defer rows.Close()
+	for rows.Next() {
+		var mover TopMover
+		_ = rows.Scan(&mover.Name, &mover.Count)
+		m.Top5Movers = append(m.Top5Movers, mover)
+	}
+
 	return m, nil
 }
