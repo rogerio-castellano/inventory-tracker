@@ -42,6 +42,7 @@ func setupTestRepo(testPassword string) {
 
 	userRepo := repo.NewInMemoryUserRepository()
 	api.SetUserRepo(userRepo)
+
 	// Pre-populate with an admin user
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
 	userRepo.CreateUser(models.User{
@@ -193,7 +194,7 @@ func TestGetProductsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	// Create products to ensure we have something to retrieve
+	// Create the first product
 	createBody := api.ProductRequest{Name: "Phone", Price: 999.99, Quantity: 1}
 	jsonCreateBody, _ := json.Marshal(createBody)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody))
@@ -215,7 +216,6 @@ func TestGetProductsHandler(t *testing.T) {
 		t.Fatalf("expected 201 Created for second product creation, got %d", createW2.Code)
 	}
 
-	// Now retrieve the products
 	getReq := httptest.NewRequest(http.MethodGet, "/products", nil)
 	getW := httptest.NewRecorder()
 	r.ServeHTTP(getW, getReq)
@@ -262,7 +262,6 @@ func TestUpdateProductHandler_Valid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	// First, create a product
 	createBody := api.ProductRequest{Name: "Old Name", Price: 100.0, Quantity: 1}
 	jsonCreateBody, _ := json.Marshal(createBody)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreateBody))
@@ -279,7 +278,6 @@ func TestUpdateProductHandler_Valid(t *testing.T) {
 		t.Fatalf("error decoding create response: %v", err)
 	}
 
-	// Now update the product
 	updateBody := api.ProductRequest{Name: "New Name", Price: 200.0, Quantity: 2}
 	jsonUpdateBody, _ := json.Marshal(updateBody)
 	updateReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", created.Id), bytes.NewReader(jsonUpdateBody))
@@ -381,7 +379,7 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 func TestFilterProductsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
-	// Seed test data
+
 	products := []api.ProductRequest{
 		{Name: "Phone", Price: 699.99, Quantity: 10},
 		{Name: "Laptop", Price: 1299.99, Quantity: 5},
@@ -503,8 +501,8 @@ func TestFilterProductsHandler(t *testing.T) {
 
 func TestAdjustQuantityHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
+
 	r := api.NewRouter()
-	// Create a product
 	create := api.ProductRequest{Name: "InventoryItem", Price: 10.0, Quantity: 10}
 	body, _ := json.Marshal(create)
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
@@ -595,7 +593,6 @@ func TestGetMovementsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	// Create a product
 	product := api.ProductRequest{Name: "Box", Price: 50.0, Quantity: 10}
 	body, _ := json.Marshal(product)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
@@ -672,7 +669,6 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	// Create a product
 	create := api.ProductRequest{Name: "FilterBox", Price: 80.0, Quantity: 10}
 	jsonCreate, _ := json.Marshal(create)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreate))
@@ -766,7 +762,6 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	// Create a product
 	create := api.ProductRequest{Name: "PagedWidget", Price: 20.0, Quantity: 5}
 	jsonCreate, _ := json.Marshal(create)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreate))
@@ -852,7 +847,6 @@ func TestExportMovementsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	// Create a product
 	product := api.ProductRequest{Name: "Exportable", Price: 100.0, Quantity: 5}
 	b, _ := json.Marshal(product)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
@@ -865,7 +859,6 @@ func TestExportMovementsHandler(t *testing.T) {
 	var created api.ProductResponse
 	json.NewDecoder(createW.Body).Decode(&created)
 
-	// Add 1 movement
 	adj := api.QuantityAdjustmentRequest{Delta: 3}
 	body, _ := json.Marshal(adj)
 	adjReq := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", created.Id), bytes.NewReader(body))
@@ -927,7 +920,6 @@ func TestExportMovementsHandler_Filtered(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	// Create a product
 	create := api.ProductRequest{Name: "FilteredExport", Price: 75.0, Quantity: 8}
 	jsonCreate, _ := json.Marshal(create)
 	createReq := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonCreate))
@@ -1077,7 +1069,7 @@ func TestRegisterHandler(t *testing.T) {
 
 	t.Run("Duplicate username returns 409", func(t *testing.T) {
 		data := map[string]string{
-			"username": "testuser", // same as above
+			"username": "testuser",
 			"password": "anotherpass",
 		}
 		body, _ := json.Marshal(data)
@@ -1123,7 +1115,6 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	// Create product with quantity 5
 	create := api.ProductRequest{Name: "ConcurrentItem", Price: 10.0, Quantity: 5}
 	body, _ := json.Marshal(create)
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
@@ -1176,7 +1167,6 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 		}
 		wg.Wait()
 
-		// Check final state
 		getReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d", created.Id), nil)
 		getW := httptest.NewRecorder()
 		r.ServeHTTP(getW, getReq)
@@ -1192,7 +1182,6 @@ func TestLowStockAlert(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	// Create product with quantity 5 and threshold 3
 	create := api.ProductRequest{
 		Name:      "AlertItem",
 		Price:     50.0,
@@ -1296,7 +1285,6 @@ func TestDashboardMetricsHandler(t *testing.T) {
 		}
 	}
 
-	// Call metrics endpoint
 	req := httptest.NewRequest(http.MethodGet, "/metrics/dashboard", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -1326,5 +1314,99 @@ func TestDashboardMetricsHandler(t *testing.T) {
 	}
 	if mp.MovementCount != 3 {
 		t.Errorf("expected 3 movements, got %v", mp.MovementCount)
+	}
+}
+
+func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := api.NewRouter()
+
+	products := []api.ProductRequest{
+		{Name: "Keyboard", Price: 50.0, Quantity: 5, Threshold: 2},
+		{Name: "Mouse", Price: 25.0, Quantity: 2, Threshold: 3},    // low stock
+		{Name: "Monitor", Price: 200.0, Quantity: 1, Threshold: 2}, // low stock
+	}
+	var mouseID int
+	for _, p := range products {
+		b, _ := json.Marshal(p)
+		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("failed to create product: %d", w.Code)
+		}
+		if p.Name == "Mouse" {
+			var resp api.ProductResponse
+			json.NewDecoder(w.Body).Decode(&resp)
+			mouseID = resp.Id
+		}
+	}
+
+	// Add 5 movements for Mouse
+	for range 5 {
+		body := api.QuantityAdjustmentRequest{Delta: 1}
+		b, _ := json.Marshal(body)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", mouseID), bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics/dashboard", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w.Code)
+	}
+
+	var m repo.Metrics
+	if err := json.NewDecoder(w.Body).Decode(&m); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if m.TotalProducts != 3 {
+		t.Errorf("expected total_products name to be 3, got %v", m.TotalProducts)
+	}
+
+	if m.TotalMovements != 5 {
+		t.Errorf("expected total_movements name to be 5, got %v", m.TotalMovements)
+	}
+
+	if m.LowStockCount != 1 {
+		t.Errorf("expected low_stock_count name to be 1, got %v", m.LowStockCount)
+	}
+
+	wantAveragePrice := float64(50+25+200) / 3.0
+	if m.AveragePrice != wantAveragePrice {
+		t.Errorf("expected average_price name to be %v = 275, got %v", wantAveragePrice, m.AveragePrice)
+	}
+
+	wantTotalStockValue := float64(50*5 + 25*(2+5) + 200*1)
+	if m.TotalStockValue != wantTotalStockValue {
+		t.Errorf("expected total_stock_value name to be %v = , got %v", wantTotalStockValue, m.TotalStockValue)
+	}
+
+	wantTotalQuantity := 5 + (2 + 5) + 1
+	if m.TotalQuantity != wantTotalQuantity {
+		t.Errorf("expected total_quantity name to be %v, got %v", wantTotalQuantity, m.TotalQuantity)
+	}
+
+	mp := m.MostMovedProduct
+	if mp.Name != "Mouse" {
+		t.Errorf("expected most_moved_product name to be Mouse, got %v", mp.Name)
+	}
+	if mp.MovementCount != 5 {
+		t.Errorf("expected Mouse movement_count = 5, got %v", mp.MovementCount)
+	}
+
+	tops := m.Top5Movers
+	if len(tops) == 0 {
+		t.Fatal("expected at least 1 top mover")
+	}
+	first := tops[0]
+	if first.Name != "Mouse" || first.Count != 5 {
+		t.Errorf("expected Mouse as top mover with count 5, got %v", first)
 	}
 }
