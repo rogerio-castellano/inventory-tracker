@@ -1,0 +1,10 @@
+# Ignore everything unnecessary
+**/*.test
+**/testdata
+vendor
+.git
+*.md
+*.env
+node_modules
+docs
+coverage

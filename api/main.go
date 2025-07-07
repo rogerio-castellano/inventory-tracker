@@ -15,6 +15,9 @@ import (
 // @description REST API for managing inventory products and stock movements.
 // @host localhost:8080
 // @BasePath /
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
 
 func main() {
 	database, err := db.Connect()

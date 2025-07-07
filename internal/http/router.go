@@ -25,6 +25,7 @@ func NewRouter() http.Handler {
 
 	r.Group(func(protected chi.Router) {
 		protected.Use(AuthMiddleware)
+
 		protected.Post("/products", CreateProductHandler)
 		protected.Put("/products/{id}", UpdateProductHandler)
 		protected.Delete("/products/{id}", DeleteProductHandler)

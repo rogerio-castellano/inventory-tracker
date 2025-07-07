@@ -201,6 +201,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Create a new product
       tags:
       - products
@@ -227,6 +229,8 @@ paths:
           description: Internal error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Delete a product
       tags:
       - products
@@ -294,6 +298,8 @@ paths:
           description: Internal error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Update a product
       tags:
       - products
@@ -332,6 +338,8 @@ paths:
           description: Internal error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Adjust quantity of a product
       tags:
       - inventory
@@ -451,6 +459,8 @@ paths:
           description: Internal error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Import products via CSV
       tags:
       - import
@@ -536,4 +546,9 @@ paths:
       summary: Register new user and return JWT token
       tags:
       - auth
+securityDefinitions:
+  Bearer:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
