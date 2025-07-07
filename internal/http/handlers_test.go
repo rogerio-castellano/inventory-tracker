@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -1408,5 +1409,49 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 	first := tops[0]
 	if first.Name != "Mouse" || first.Count != 5 {
 		t.Errorf("expected Mouse as top mover with count 5, got %v", first)
+	}
+}
+
+func TestImportProductsHandler(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := api.NewRouter()
+
+	// Create CSV data (2 valid, 1 invalid)
+	csvData := `name,price,quantity,threshold
+Mouse,25.99,10,2
+Keyboard,45.00,5,1
+InvalidProduct,0,3,1`
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	part, _ := writer.CreateFormFile("file", "products.csv")
+	part.Write([]byte(csvData))
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/products/import", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w.Code)
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	imported := int(resp["imported"].(float64))
+	errors := resp["errors"].([]any)
+
+	if imported != 2 {
+		t.Errorf("expected 2 imported products, got %d", imported)
+	}
+	if len(errors) != 1 {
+		t.Errorf("expected 1 error, got %d", len(errors))
+	} else if !strings.Contains(errors[0].(string), "row 4") {
+		t.Errorf("expected error for row 4, got %v", errors[0])
 	}
 }
