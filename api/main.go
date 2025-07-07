@@ -18,6 +18,7 @@ func main() {
 	httpdelivery.SetProductRepo(repo.NewPostgresProductRepository(database))
 	httpdelivery.SetMovementRepo(repo.NewPostgresMovementRepository(database))
 	httpdelivery.SetUserRepo(repo.NewPostgresUserRepository(database))
+	httpdelivery.SetMetricsRepo(repo.NewPostgresMetricsRepository(database))
 
 	r := httpdelivery.NewRouter()
 	log.Println("✅ Server running on :8080")

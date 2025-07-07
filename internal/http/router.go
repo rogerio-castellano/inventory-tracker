@@ -22,6 +22,8 @@ func NewRouter() http.Handler {
 	r.Post("/login", LoginHandler)
 	r.Post("/register", RegisterHandler)
 
+	r.Get("/metrics/dashboard", GetDashboardMetricsHandler)
+
 	r.Group(func(protected chi.Router) {
 		protected.Use(AuthMiddleware)
 		protected.Post("/products", CreateProductHandler)

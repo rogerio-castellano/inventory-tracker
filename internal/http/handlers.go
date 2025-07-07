@@ -636,3 +636,19 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		"token":   token,
 	})
 }
+
+var metricsRepo repo.MetricsRepository
+
+func SetMetricsRepo(r repo.MetricsRepository) {
+	metricsRepo = r
+}
+
+func GetDashboardMetricsHandler(w http.ResponseWriter, r *http.Request) {
+	m, err := metricsRepo.GetDashboardMetrics()
+	if err != nil {
+		http.Error(w, "failed to fetch metrics", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(m)
+}
