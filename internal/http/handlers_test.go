@@ -36,8 +36,10 @@ func init() {
 func setupTestRepo(testPassword string) {
 	productRepo = repo.NewInMemoryProductRepository()
 	api.SetProductRepo(productRepo)
+
 	movementRepo = repo.NewInMemoryMovementRepository()
 	api.SetMovementRepo(movementRepo)
+
 	userRepo := repo.NewInMemoryUserRepository()
 	api.SetUserRepo(userRepo)
 	// Pre-populate with an admin user
@@ -46,6 +48,10 @@ func setupTestRepo(testPassword string) {
 		Username:     "admin",
 		PasswordHash: string(passwordHash),
 	})
+
+	metricsRepo := repo.NewInMemoryMetricsRepository()
+	api.SetMetricsRepo(metricsRepo)
+	metricsRepo.SetRepositories(productRepo, movementRepo)
 }
 
 func TestCreateProductHandler_Valid(t *testing.T) {
@@ -1253,4 +1259,77 @@ func generateToken(r http.Handler, username, password string) (string, error) {
 	}
 
 	return resp["token"], nil
+}
+
+func TestDashboardMetricsHandler(t *testing.T) {
+	t.Cleanup(clearAllProducts)
+	r := api.NewRouter()
+
+	// Create 3 products (2 below threshold)
+	products := []api.ProductRequest{
+		{Name: "Keyboard", Price: 40.0, Quantity: 10, Threshold: 5},
+		{Name: "Mouse", Price: 20.0, Quantity: 1, Threshold: 5},    // below threshold
+		{Name: "Monitor", Price: 150.0, Quantity: 2, Threshold: 3}, // below threshold
+	}
+	var mouseID int
+	for _, p := range products {
+		b, _ := json.Marshal(p)
+		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("product creation failed: %d", w.Code)
+		}
+		if p.Name == "Mouse" {
+			var resp api.ProductResponse
+			json.NewDecoder(w.Body).Decode(&resp)
+			mouseID = resp.Id
+		}
+	}
+
+	// Add 3 movements for Mouse
+	for range 3 {
+		body := api.QuantityAdjustmentRequest{Delta: 1}
+		b, _ := json.Marshal(body)
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", mouseID), bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("failed to adjust quantity: %d", w.Code)
+		}
+	}
+
+	// Call metrics endpoint
+	req := httptest.NewRequest(http.MethodGet, "/metrics/dashboard", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w.Code)
+	}
+
+	var metrics repo.Metrics
+	if err := json.NewDecoder(w.Body).Decode(&metrics); err != nil {
+		t.Fatalf("failed to decode metrics: %v", err)
+	}
+
+	if metrics.TotalProducts != 3 {
+		t.Errorf("expected 3 products, got %v", metrics.TotalProducts)
+	}
+	if metrics.TotalMovements < 3 {
+		t.Errorf("expected at least 3 movements, got %v", metrics.TotalMovements)
+	}
+	if metrics.LowStockCount != 2 {
+		t.Errorf("expected 2 low stock products, got %v", metrics.LowStockCount)
+	}
+
+	mp := metrics.MostMovedProduct
+	if mp.Name != "Mouse" {
+		t.Errorf("expected Mouse as most moved, got %v", mp.Name)
+	}
+	if mp.MovementCount != 3 {
+		t.Errorf("expected 3 movements, got %v", mp.MovementCount)
+	}
 }
