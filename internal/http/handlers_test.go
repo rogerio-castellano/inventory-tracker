@@ -13,6 +13,7 @@ import (
 	"time"
 
 	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
+	handler "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 	"golang.org/x/crypto/bcrypt"
@@ -36,13 +37,13 @@ func init() {
 
 func setupTestRepo(testPassword string) {
 	productRepo = repo.NewInMemoryProductRepository()
-	api.SetProductRepo(productRepo)
+	handler.SetProductRepo(productRepo)
 
 	movementRepo = repo.NewInMemoryMovementRepository()
-	api.SetMovementRepo(movementRepo)
+	handler.SetMovementRepo(movementRepo)
 
 	userRepo := repo.NewInMemoryUserRepository()
-	api.SetUserRepo(userRepo)
+	handler.SetUserRepo(userRepo)
 
 	// Pre-populate with an admin user
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
@@ -52,7 +53,7 @@ func setupTestRepo(testPassword string) {
 	})
 
 	metricsRepo := repo.NewInMemoryMetricsRepository()
-	api.SetMetricsRepo(metricsRepo)
+	handler.SetMetricsRepo(metricsRepo)
 	metricsRepo.SetRepositories(productRepo, movementRepo)
 }
 
@@ -61,13 +62,13 @@ func clearAllProducts() {
 }
 
 func generateToken(r http.Handler, username, password string) (string, error) {
-	payload := api.UserLogin{Username: username, Password: password}
+	payload := handler.UserLogin{Username: username, Password: password}
 	body, _ := json.Marshal(payload)
 	loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 	loginW := httptest.NewRecorder()
 	r.ServeHTTP(loginW, loginReq)
 
-	var resp api.LoginResult
+	var resp handler.LoginResult
 	err := json.NewDecoder(loginW.Body).Decode(&resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode token response: %v", err)
@@ -76,7 +77,7 @@ func generateToken(r http.Handler, username, password string) (string, error) {
 	return resp.Token, nil
 }
 
-func createProduct(r http.Handler, product api.ProductRequest) *httptest.ResponseRecorder {
+func createProduct(r http.Handler, product handler.ProductRequest) *httptest.ResponseRecorder {
 	jsonBody, _ := json.Marshal(product)
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -90,13 +91,13 @@ func TestCreateProductHandler_Valid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	w := createProduct(r, api.ProductRequest{Name: "Laptop", Price: 1500.0, Quantity: 1})
+	w := createProduct(r, handler.ProductRequest{Name: "Laptop", Price: 1500.0, Quantity: 1})
 
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created, got %d", w.Code)
 	}
 
-	var resp api.ProductResponse
+	var resp handler.ProductResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
@@ -118,31 +119,31 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		payload        api.ProductRequest
+		payload        handler.ProductRequest
 		expectCode     int
 		expectedErrors []string
 	}{
 		{
 			name:           "Empty name and price",
-			payload:        api.ProductRequest{Name: "", Price: 0.0},
+			payload:        handler.ProductRequest{Name: "", Price: 0.0},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"Name", "Price"},
 		},
 		{
 			name:           "Empty name only",
-			payload:        api.ProductRequest{Name: "", Price: 100.0},
+			payload:        handler.ProductRequest{Name: "", Price: 100.0},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"Name"},
 		},
 		{
 			name:           "Invalid price only",
-			payload:        api.ProductRequest{Name: "Mouse", Price: -5.0},
+			payload:        handler.ProductRequest{Name: "Mouse", Price: -5.0},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"Price"},
 		},
 		{
 			name:           "Negative quantity",
-			payload:        api.ProductRequest{Name: "Keyboard", Price: 50.0, Quantity: -1},
+			payload:        handler.ProductRequest{Name: "Keyboard", Price: 50.0, Quantity: -1},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"Quantity"},
 		},
@@ -156,7 +157,7 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 				t.Errorf("expected status %d, got %d", tt.expectCode, w.Code)
 			}
 
-			var resp []api.ProductValidationError
+			var resp []handler.ProductValidationError
 			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 				t.Fatalf("error decoding response: %v", err)
 			}
@@ -203,14 +204,14 @@ func TestGetProductsHandler(t *testing.T) {
 	r := api.NewRouter()
 
 	// Create the first product
-	product1 := api.ProductRequest{Name: "Phone", Price: 999.99, Quantity: 1}
+	product1 := handler.ProductRequest{Name: "Phone", Price: 999.99, Quantity: 1}
 	w1 := createProduct(r, product1)
 	if w1.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created for product creation, got %d", w1.Code)
 	}
 
 	// Create a second product
-	product2 := api.ProductRequest{Name: "Tablet", Price: 499.99, Quantity: 2}
+	product2 := handler.ProductRequest{Name: "Tablet", Price: 499.99, Quantity: 2}
 	w2 := createProduct(r, product2)
 
 	if w2.Code != http.StatusCreated {
@@ -225,7 +226,7 @@ func TestGetProductsHandler(t *testing.T) {
 		t.Fatalf("expected 200 OK for product retrieval, got %d", getW.Code)
 	}
 
-	var products []api.ProductResponse
+	var products []handler.ProductResponse
 	if err := json.NewDecoder(getW.Body).Decode(&products); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
@@ -262,18 +263,18 @@ func TestGetProductsHandler(t *testing.T) {
 func TestUpdateProductHandler_Valid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
-	product := api.ProductRequest{Name: "Old Name", Price: 100.0, Quantity: 1}
+	product := handler.ProductRequest{Name: "Old Name", Price: 100.0, Quantity: 1}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created, got %d", w.Code)
 	}
 
-	var created api.ProductResponse
+	var created handler.ProductResponse
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("error decoding create response: %v", err)
 	}
 
-	updateBody := api.ProductRequest{Name: "New Name", Price: 200.0, Quantity: 2}
+	updateBody := handler.ProductRequest{Name: "New Name", Price: 200.0, Quantity: 2}
 	jsonUpdateBody, _ := json.Marshal(updateBody)
 	updateReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", created.Id), bytes.NewReader(jsonUpdateBody))
 	updateReq.Header.Set("Authorization", "Bearer "+token)
@@ -284,7 +285,7 @@ func TestUpdateProductHandler_Valid(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d", updateW.Code)
 	}
 
-	var updated api.ProductResponse
+	var updated handler.ProductResponse
 	if err := json.NewDecoder(updateW.Body).Decode(&updated); err != nil {
 		t.Fatalf("error decoding update response: %v", err)
 	}
@@ -302,7 +303,7 @@ func TestUpdateProductHandler_Valid(t *testing.T) {
 
 func TestUpdateProductHandler_NotFound(t *testing.T) {
 	r := api.NewRouter()
-	updateBody := api.ProductRequest{Name: "Ghost", Price: 1.0}
+	updateBody := handler.ProductRequest{Name: "Ghost", Price: 1.0}
 	jsonBody, _ := json.Marshal(updateBody)
 	req := httptest.NewRequest(http.MethodPut, "/products/999999", bytes.NewReader(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -331,16 +332,16 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	product := api.ProductRequest{Name: "Temporary", Price: 100.0, Quantity: 1}
+	product := handler.ProductRequest{Name: "Temporary", Price: 100.0, Quantity: 1}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created, got %d", w.Code)
 	}
-	var created api.ProductResponse
+	var created handler.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
 
 	// Try invalid update
-	invalidUpdate := api.ProductRequest{Name: "", Price: -100, Quantity: -1}
+	invalidUpdate := handler.ProductRequest{Name: "", Price: -100, Quantity: -1}
 	jsonInvalid, _ := json.Marshal(invalidUpdate)
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", created.Id), bytes.NewReader(jsonInvalid))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -351,7 +352,7 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 		t.Errorf("expected 400 Bad Request, got %d", wResult.Code)
 	}
 
-	var resp []api.ProductValidationError
+	var resp []handler.ProductValidationError
 	if err := json.NewDecoder(wResult.Body).Decode(&resp); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
@@ -379,7 +380,7 @@ func TestFilterProductsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	products := []api.ProductRequest{
+	products := []handler.ProductRequest{
 		{Name: "Phone", Price: 699.99, Quantity: 10},
 		{Name: "Laptop", Price: 1299.99, Quantity: 5},
 		{Name: "Mouse", Price: 29.99, Quantity: 50},
@@ -401,7 +402,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp api.ProductsSearchResult
+		var resp handler.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		if len(resp.Data) != 1 || !strings.Contains(strings.ToLower(resp.Data[0].Name), "phone") {
 			t.Errorf("expected one product containing 'phone', got %v", resp.Data)
@@ -416,7 +417,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp api.ProductsSearchResult
+		var resp handler.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		for _, p := range resp.Data {
 			price := p.Price
@@ -434,7 +435,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp api.ProductsSearchResult
+		var resp handler.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		for _, p := range resp.Data {
 			qty := p.Quantity
@@ -452,7 +453,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp api.ProductsSearchResult
+		var resp handler.ProductsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		if got := len(resp.Data); got != 0 {
 			t.Errorf("expected empty result, got %d items", got)
@@ -467,7 +468,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp api.ProductsSearchResult
+		var resp handler.ProductsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}
@@ -484,7 +485,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp api.ProductsSearchResult
+		var resp handler.ProductsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}
@@ -494,7 +495,7 @@ func TestFilterProductsHandler(t *testing.T) {
 	})
 }
 
-func adjustProduct(r http.Handler, productID int, adjustment api.QuantityAdjustmentRequest) *httptest.ResponseRecorder {
+func adjustProduct(r http.Handler, productID int, adjustment handler.QuantityAdjustmentRequest) *httptest.ResponseRecorder {
 	jsonBody, _ := json.Marshal(adjustment)
 	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", productID), bytes.NewReader(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -508,22 +509,22 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 
 	r := api.NewRouter()
-	product := api.ProductRequest{Name: "InventoryItem", Price: 10.0, Quantity: 10}
+	product := handler.ProductRequest{Name: "InventoryItem", Price: 10.0, Quantity: 10}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created api.ProductRequest
+	var created handler.ProductRequest
 	json.NewDecoder(w.Body).Decode(&created)
 
 	t.Run("Increase quantity", func(t *testing.T) {
-		adj := api.QuantityAdjustmentRequest{Delta: 5}
+		adj := handler.QuantityAdjustmentRequest{Delta: 5}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp api.ProductResponse
+		var resp handler.ProductResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 		if resp.Quantity != 15 {
 			t.Errorf("expected quantity 15, got %v", resp.Quantity)
@@ -531,13 +532,13 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Decrease quantity", func(t *testing.T) {
-		adj := api.QuantityAdjustmentRequest{Delta: -3}
+		adj := handler.QuantityAdjustmentRequest{Delta: -3}
 		w := adjustProduct(r, created.Id, adj)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.ProductResponse
+		var resp handler.ProductResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 		if resp.Quantity != 12.0 {
 			t.Errorf("expected quantity 12, got %v", resp.Quantity)
@@ -545,7 +546,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Too much decrease (underflow)", func(t *testing.T) {
-		adj := api.QuantityAdjustmentRequest{Delta: -100}
+		adj := handler.QuantityAdjustmentRequest{Delta: -100}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusConflict {
@@ -554,7 +555,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Invalid ID", func(t *testing.T) {
-		adj := api.QuantityAdjustmentRequest{Delta: 1}
+		adj := handler.QuantityAdjustmentRequest{Delta: 1}
 		body, _ := json.Marshal(adj)
 		req := httptest.NewRequest(http.MethodPost, "/products/abc/adjust", bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -582,17 +583,17 @@ func TestGetMovementsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	product := api.ProductRequest{Name: "Box", Price: 50.0, Quantity: 10}
+	product := handler.ProductRequest{Name: "Box", Price: 50.0, Quantity: 10}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created api.ProductResponse
+	var created handler.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
 
 	// Adjust quantity twice to generate movement log
 	adjust := func(delta int) {
-		adj := api.QuantityAdjustmentRequest{Delta: delta}
+		adj := handler.QuantityAdjustmentRequest{Delta: delta}
 		w := adjustProduct(r, created.Id, adj)
 		if w.Code != http.StatusOK {
 			t.Fatalf("failed to adjust quantity: delta %d", delta)
@@ -610,7 +611,7 @@ func TestGetMovementsHandler(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var movementsCollection api.MovementsSearchResult
+		var movementsCollection handler.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -638,7 +639,7 @@ func TestGetMovementsHandler(t *testing.T) {
 			t.Errorf("expected 400 Not Found, got %d", w.Code)
 		}
 
-		var movements api.MovementsSearchResult
+		var movements handler.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&movements)
 		if count := movements.Meta.TotalCount; count != 0 {
 			t.Errorf("expected 0 movements, got %d", count)
@@ -650,19 +651,19 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	product := api.ProductRequest{Name: "FilterBox", Price: 80.0, Quantity: 10}
+	product := handler.ProductRequest{Name: "FilterBox", Price: 80.0, Quantity: 10}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created api.ProductResponse
+	var created handler.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
 
 	// First adjustment: backdated (manually insert)
 	movementRepo.AddMovement(created.Id, 5, time.Now().Add(-48*time.Hour).UTC())
 
 	// Second adjustment: recent
-	adj := api.QuantityAdjustmentRequest{Delta: 2}
+	adj := handler.QuantityAdjustmentRequest{Delta: 2}
 	w2 := adjustProduct(r, created.Id, adj)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("failed to adjust product")
@@ -674,7 +675,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection api.MovementsSearchResult
+		var movementsCollection handler.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -689,7 +690,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection api.MovementsSearchResult
+		var movementsCollection handler.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -705,7 +706,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection api.MovementsSearchResult
+		var movementsCollection handler.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -721,7 +722,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection api.MovementsSearchResult
+		var movementsCollection handler.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -735,18 +736,18 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	product := api.ProductRequest{Name: "PagedWidget", Price: 20.0, Quantity: 5}
+	product := handler.ProductRequest{Name: "PagedWidget", Price: 20.0, Quantity: 5}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created api.ProductResponse
+	var created handler.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
 
 	// Generate 3 movements
 	deltas := []int{+1, -1, +2}
 	for _, d := range deltas {
-		adj := api.QuantityAdjustmentRequest{Delta: d}
+		adj := handler.QuantityAdjustmentRequest{Delta: d}
 		w := adjustProduct(r, created.Id, adj)
 		if w.Code != http.StatusOK {
 			t.Fatalf("failed to adjust delta %d", d)
@@ -762,7 +763,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.MovementsSearchResult
+		var resp handler.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 
 		if resp.Meta.TotalCount == 0 {
@@ -783,7 +784,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.MovementsSearchResult
+		var resp handler.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		if count := len(resp.Data); count != 2 {
 			t.Errorf("expected 2 items, got %d", count)
@@ -799,7 +800,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.MovementsSearchResult
+		var resp handler.MovementsSearchResult
 		json.NewDecoder(w.Body).Decode(&resp)
 		items := resp.Data
 		if len(items) != 1 {
@@ -812,15 +813,15 @@ func TestExportMovementsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	product := api.ProductRequest{Name: "Exportable", Price: 100.0, Quantity: 5}
+	product := handler.ProductRequest{Name: "Exportable", Price: 100.0, Quantity: 5}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created api.ProductResponse
+	var created handler.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
 
-	adj := api.QuantityAdjustmentRequest{Delta: 3}
+	adj := handler.QuantityAdjustmentRequest{Delta: 3}
 	w2 := adjustProduct(r, created.Id, adj)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("failed to adjust product")
@@ -877,19 +878,19 @@ func TestExportMovementsHandler_Filtered(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	product := api.ProductRequest{Name: "FilteredExport", Price: 75.0, Quantity: 8}
+	product := handler.ProductRequest{Name: "FilteredExport", Price: 75.0, Quantity: 8}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created api.ProductResponse
+	var created handler.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
 
 	// Insert one old movement
 	movementRepo.AddMovement(created.Id, -1, time.Now().Add(-72*time.Hour).UTC())
 
 	// Insert one recent movement via API
-	adj := api.QuantityAdjustmentRequest{Delta: 2}
+	adj := handler.QuantityAdjustmentRequest{Delta: 2}
 	w2 := adjustProduct(r, created.Id, adj)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("failed to add recent movement")
@@ -934,7 +935,7 @@ func TestAuthFlow(t *testing.T) {
 	r := api.NewRouter()
 
 	t.Run("Login with valid credentials", func(t *testing.T) {
-		payload := api.UserLogin{Username: "admin", Password: "secret"}
+		payload := handler.UserLogin{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
 		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 		w := httptest.NewRecorder()
@@ -944,7 +945,7 @@ func TestAuthFlow(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.LoginResult
+		var resp handler.LoginResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode token response: %v", err)
 		}
@@ -954,7 +955,7 @@ func TestAuthFlow(t *testing.T) {
 	})
 
 	t.Run("Protected route without token is rejected", func(t *testing.T) {
-		product := api.ProductRequest{Name: "AuthBox", Price: 999.0, Quantity: 1}
+		product := handler.ProductRequest{Name: "AuthBox", Price: 999.0, Quantity: 1}
 		b, _ := json.Marshal(product)
 		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
 		w := httptest.NewRecorder()
@@ -966,17 +967,17 @@ func TestAuthFlow(t *testing.T) {
 	})
 
 	t.Run("Protected route with valid token succeeds", func(t *testing.T) {
-		payload := api.UserLogin{Username: "admin", Password: "secret"}
+		payload := handler.UserLogin{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
 		loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 		loginW := httptest.NewRecorder()
 		r.ServeHTTP(loginW, loginReq)
 
-		var resp api.LoginResult
+		var resp handler.LoginResult
 		_ = json.NewDecoder(loginW.Body).Decode(&resp)
 		token := resp.Token
 
-		product := api.ProductRequest{Name: "SecureProduct", Price: 10.0, Quantity: 2}
+		product := handler.ProductRequest{Name: "SecureProduct", Price: 10.0, Quantity: 2}
 		b, _ := json.Marshal(product)
 		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -994,7 +995,7 @@ func TestRegisterHandler(t *testing.T) {
 	r := api.NewRouter()
 
 	t.Run("Valid registration returns token", func(t *testing.T) {
-		data := api.UserLogin{
+		data := handler.UserLogin{
 			Username: "testuser",
 			Password: "strongpassword",
 		}
@@ -1007,7 +1008,7 @@ func TestRegisterHandler(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Fatalf("expected 201 Created, got %d", w.Code)
 		}
-		var resp api.RegisterResult
+		var resp handler.RegisterResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -1017,7 +1018,7 @@ func TestRegisterHandler(t *testing.T) {
 	})
 
 	t.Run("Duplicate username returns 409", func(t *testing.T) {
-		data := api.UserLogin{
+		data := handler.UserLogin{
 			Username: "testuser",
 			Password: "anotherpass",
 		}
@@ -1033,7 +1034,7 @@ func TestRegisterHandler(t *testing.T) {
 	})
 
 	t.Run("Too short password returns 400", func(t *testing.T) {
-		data := api.UserLogin{
+		data := handler.UserLogin{
 			Username: "shortpass",
 			Password: "123",
 		}
@@ -1064,17 +1065,17 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	product := api.ProductRequest{Name: "ConcurrentItem", Price: 10.0, Quantity: 5}
+	product := handler.ProductRequest{Name: "ConcurrentItem", Price: 10.0, Quantity: 5}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created api.ProductResponse
+	var created handler.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
 
 	// ❌ Try deducting more than available
 	t.Run("Reject over-deduction", func(t *testing.T) {
-		adj := api.QuantityAdjustmentRequest{Delta: -10}
+		adj := handler.QuantityAdjustmentRequest{Delta: -10}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusConflict {
@@ -1096,7 +1097,7 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 				if i%2 == 0 {
 					delta = +1
 				}
-				adj := api.QuantityAdjustmentRequest{Delta: delta}
+				adj := handler.QuantityAdjustmentRequest{Delta: delta}
 				w := adjustProduct(r, created.Id, adj)
 
 				if w.Code == http.StatusOK {
@@ -1109,7 +1110,7 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 		getReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d", created.Id), nil)
 		getW := httptest.NewRecorder()
 		r.ServeHTTP(getW, getReq)
-		var final api.ProductResponse
+		var final handler.ProductResponse
 		json.NewDecoder(getW.Body).Decode(&final)
 		if final.Quantity < 0 {
 			t.Errorf("quantity should not go negative, got %d", final.Quantity)
@@ -1121,7 +1122,7 @@ func TestLowStockAlert(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	product := api.ProductRequest{
+	product := handler.ProductRequest{
 		Name:      "AlertItem",
 		Price:     50.0,
 		Quantity:  5,
@@ -1131,12 +1132,12 @@ func TestLowStockAlert(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product: %d", w.Code)
 	}
-	var created api.ProductResponse
+	var created handler.ProductResponse
 	json.NewDecoder(w.Body).Decode(&created)
 
 	// Adjust to just above threshold (5 → 4) → no alert
 	t.Run("No alert above threshold", func(t *testing.T) {
-		adj := api.QuantityAdjustmentRequest{Delta: -1}
+		adj := handler.QuantityAdjustmentRequest{Delta: -1}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusOK {
@@ -1154,14 +1155,14 @@ func TestLowStockAlert(t *testing.T) {
 
 	// Adjust to below threshold (4 → 2) → should trigger alert
 	t.Run("Alert triggered below threshold", func(t *testing.T) {
-		adj := api.QuantityAdjustmentRequest{Delta: -2}
+		adj := handler.QuantityAdjustmentRequest{Delta: -2}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.ProductResponse
+		var resp handler.ProductResponse
 		json.NewDecoder(w.Body).Decode(&resp)
 
 		if resp.LowStock != true {
@@ -1175,7 +1176,7 @@ func TestDashboardMetricsHandler(t *testing.T) {
 	r := api.NewRouter()
 
 	// Create 3 products (2 below threshold)
-	products := []api.ProductRequest{
+	products := []handler.ProductRequest{
 		{Name: "Keyboard", Price: 40.0, Quantity: 10, Threshold: 5},
 		{Name: "Mouse", Price: 20.0, Quantity: 1, Threshold: 5},    // below threshold
 		{Name: "Monitor", Price: 150.0, Quantity: 2, Threshold: 3}, // below threshold
@@ -1187,7 +1188,7 @@ func TestDashboardMetricsHandler(t *testing.T) {
 			t.Fatalf("product creation failed: %d", w.Code)
 		}
 		if p.Name == "Mouse" {
-			var resp api.ProductResponse
+			var resp handler.ProductResponse
 			json.NewDecoder(w.Body).Decode(&resp)
 			mouseID = resp.Id
 		}
@@ -1195,7 +1196,7 @@ func TestDashboardMetricsHandler(t *testing.T) {
 
 	// Add 3 movements for Mouse
 	for range 3 {
-		adj := api.QuantityAdjustmentRequest{Delta: 1}
+		adj := handler.QuantityAdjustmentRequest{Delta: 1}
 		w := adjustProduct(r, mouseID, adj)
 
 		if w.Code != http.StatusOK {
@@ -1239,7 +1240,7 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 	r := api.NewRouter()
 
-	products := []api.ProductRequest{
+	products := []handler.ProductRequest{
 		{Name: "Keyboard", Price: 50.0, Quantity: 5, Threshold: 2},
 		{Name: "Mouse", Price: 25.0, Quantity: 2, Threshold: 3},    // low stock
 		{Name: "Monitor", Price: 200.0, Quantity: 1, Threshold: 2}, // low stock
@@ -1251,7 +1252,7 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 			t.Fatalf("failed to create product: %d", w.Code)
 		}
 		if p.Name == "Mouse" {
-			var resp api.ProductResponse
+			var resp handler.ProductResponse
 			json.NewDecoder(w.Body).Decode(&resp)
 			mouseID = resp.Id
 		}
@@ -1259,7 +1260,7 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 
 	// Add 5 movements for Mouse
 	for range 5 {
-		adj := api.QuantityAdjustmentRequest{Delta: 1}
+		adj := handler.QuantityAdjustmentRequest{Delta: 1}
 		adjustProduct(r, mouseID, adj)
 	}
 
@@ -1348,7 +1349,7 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.ImportProductsResult
+		var resp handler.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -1388,7 +1389,7 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.ImportProductsResult
+		var resp handler.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -1436,7 +1437,7 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.ImportProductsResult
+		var resp handler.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -1479,7 +1480,7 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.ImportProductsResult
+		var resp handler.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -1500,7 +1501,7 @@ Keyboard,45.00,5,1`
 
 	t.Run("Import with update mode replaces product", func(t *testing.T) {
 		// Create a product to update
-		original := api.ProductRequest{Name: "Monitor", Price: 200.0, Quantity: 5, Threshold: 2}
+		original := handler.ProductRequest{Name: "Monitor", Price: 200.0, Quantity: 5, Threshold: 2}
 		createProduct(r, original)
 
 		// Import CSV with same product name but new values
@@ -1523,7 +1524,7 @@ Monitor,99.0,1,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp api.ImportProductsResult
+		var resp handler.ImportProductsResult
 		json.NewDecoder(w.Body).Decode(&resp)
 
 		if resp.ImportedProductsCount != 1 {
@@ -1535,7 +1536,7 @@ Monitor,99.0,1,1`
 		getW := httptest.NewRecorder()
 		r.ServeHTTP(getW, get)
 
-		var all []api.ProductResponse
+		var all []handler.ProductResponse
 		json.NewDecoder(getW.Body).Decode(&all)
 
 		for _, p := range all {

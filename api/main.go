@@ -5,7 +5,8 @@ import (
 	"net/http"
 
 	"github.com/rogerio-castellano/inventory-tracker/internal/db"
-	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
+	httpRoutes "github.com/rogerio-castellano/inventory-tracker/internal/http"
+	routes "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
@@ -23,12 +24,12 @@ func main() {
 		log.Fatal("❌ Could not connect to database:", err)
 	}
 
-	api.SetProductRepo(repo.NewPostgresProductRepository(database))
-	api.SetMovementRepo(repo.NewPostgresMovementRepository(database))
-	api.SetUserRepo(repo.NewPostgresUserRepository(database))
-	api.SetMetricsRepo(repo.NewPostgresMetricsRepository(database))
+	routes.SetProductRepo(repo.NewPostgresProductRepository(database))
+	routes.SetMovementRepo(repo.NewPostgresMovementRepository(database))
+	routes.SetUserRepo(repo.NewPostgresUserRepository(database))
+	routes.SetMetricsRepo(repo.NewPostgresMetricsRepository(database))
 
-	r := api.NewRouter()
+	r := httpRoutes.NewRouter()
 	log.Println("✅ Server running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)

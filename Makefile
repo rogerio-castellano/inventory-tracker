@@ -1,6 +1,6 @@
 APP_NAME = inventory-api
 IMAGE_NAME = inventory-tracker
-PWD := $(shell pwd)
+PWD = $(shell pwd)
 
 build:
 	go build -o $(APP_NAME) ./api/main.go
