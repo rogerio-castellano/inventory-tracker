@@ -61,19 +61,19 @@ func clearAllProducts() {
 }
 
 func generateToken(r http.Handler, username, password string) (string, error) {
-	payload := map[string]string{"username": username, "password": password}
+	payload := api.UserLogin{Username: username, Password: password}
 	body, _ := json.Marshal(payload)
 	loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 	loginW := httptest.NewRecorder()
 	r.ServeHTTP(loginW, loginReq)
 
-	var resp map[string]string
+	var resp api.LoginResult
 	err := json.NewDecoder(loginW.Body).Decode(&resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode token response: %v", err)
 	}
 
-	return resp["token"], nil
+	return resp.Token, nil
 }
 
 func createProduct(r http.Handler, product api.ProductRequest) *httptest.ResponseRecorder {
@@ -126,25 +126,25 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 			name:           "Empty name and price",
 			payload:        api.ProductRequest{Name: "", Price: 0.0},
 			expectCode:     http.StatusBadRequest,
-			expectedErrors: []string{"name", "price"},
+			expectedErrors: []string{"Name", "Price"},
 		},
 		{
 			name:           "Empty name only",
 			payload:        api.ProductRequest{Name: "", Price: 100.0},
 			expectCode:     http.StatusBadRequest,
-			expectedErrors: []string{"name"},
+			expectedErrors: []string{"Name"},
 		},
 		{
 			name:           "Invalid price only",
 			payload:        api.ProductRequest{Name: "Mouse", Price: -5.0},
 			expectCode:     http.StatusBadRequest,
-			expectedErrors: []string{"price"},
+			expectedErrors: []string{"Price"},
 		},
 		{
 			name:           "Negative quantity",
 			payload:        api.ProductRequest{Name: "Keyboard", Price: 50.0, Quantity: -1},
 			expectCode:     http.StatusBadRequest,
-			expectedErrors: []string{"quantity"},
+			expectedErrors: []string{"Quantity"},
 		},
 	}
 
@@ -156,14 +156,20 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 				t.Errorf("expected status %d, got %d", tt.expectCode, w.Code)
 			}
 
-			var resp map[string]map[string]string
+			var resp []api.ProductValidationError
 			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 				t.Fatalf("error decoding response: %v", err)
 			}
 
-			errorsMap := resp["errors"]
 			for _, field := range tt.expectedErrors {
-				if _, ok := errorsMap[field]; !ok {
+				found := false
+				for _, err := range resp {
+					if strings.EqualFold(err.Field, field) {
+						found = true
+						break
+					}
+				}
+				if !found {
 					t.Errorf("expected error for field %q, but not found", field)
 				}
 			}
@@ -338,27 +344,35 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 	jsonInvalid, _ := json.Marshal(invalidUpdate)
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", created.Id), bytes.NewReader(jsonInvalid))
 	req.Header.Set("Authorization", "Bearer "+token)
-	w2 := httptest.NewRecorder()
-	r.ServeHTTP(w2, req)
+	wResult := httptest.NewRecorder()
+	r.ServeHTTP(wResult, req)
 
-	if w2.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 Bad Request, got %d", w2.Code)
+	if wResult.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request, got %d", wResult.Code)
 	}
 
-	var resp map[string]map[string]string
-	if err := json.NewDecoder(w2.Body).Decode(&resp); err != nil {
+	var resp []api.ProductValidationError
+	if err := json.NewDecoder(wResult.Body).Decode(&resp); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
-	errorsMap := resp["errors"]
-	if _, ok := errorsMap["name"]; !ok {
-		t.Errorf("expected validation error for 'name'")
+
+	assertField := func(field string) {
+		found := false
+		for _, err := range resp {
+			if err.Field == field {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("expected validation error for '%v'", "Name")
+		}
 	}
-	if _, ok := errorsMap["price"]; !ok {
-		t.Errorf("expected validation error for 'price'")
-	}
-	if _, ok := errorsMap["quantity"]; !ok {
-		t.Errorf("expected validation error for 'quantity'")
-	}
+
+	assertField("Name")
+	assertField("Price")
+	assertField("Quantity")
 }
 
 func TestFilterProductsHandler(t *testing.T) {
@@ -920,7 +934,7 @@ func TestAuthFlow(t *testing.T) {
 	r := api.NewRouter()
 
 	t.Run("Login with valid credentials", func(t *testing.T) {
-		payload := map[string]string{"username": "admin", "password": "secret"}
+		payload := api.UserLogin{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
 		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 		w := httptest.NewRecorder()
@@ -930,11 +944,11 @@ func TestAuthFlow(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp map[string]string
+		var resp api.LoginResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode token response: %v", err)
 		}
-		if resp["token"] == "" {
+		if resp.Token == "" {
 			t.Error("expected token in response")
 		}
 	})
@@ -952,15 +966,15 @@ func TestAuthFlow(t *testing.T) {
 	})
 
 	t.Run("Protected route with valid token succeeds", func(t *testing.T) {
-		payload := map[string]string{"username": "admin", "password": "secret"}
+		payload := api.UserLogin{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
 		loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 		loginW := httptest.NewRecorder()
 		r.ServeHTTP(loginW, loginReq)
 
-		var resp map[string]string
+		var resp api.LoginResult
 		_ = json.NewDecoder(loginW.Body).Decode(&resp)
-		token := resp["token"]
+		token := resp.Token
 
 		product := api.ProductRequest{Name: "SecureProduct", Price: 10.0, Quantity: 2}
 		b, _ := json.Marshal(product)
@@ -980,9 +994,9 @@ func TestRegisterHandler(t *testing.T) {
 	r := api.NewRouter()
 
 	t.Run("Valid registration returns token", func(t *testing.T) {
-		data := map[string]string{
-			"username": "testuser",
-			"password": "strongpassword",
+		data := api.UserLogin{
+			Username: "testuser",
+			Password: "strongpassword",
 		}
 		body, _ := json.Marshal(data)
 		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
@@ -993,19 +1007,19 @@ func TestRegisterHandler(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Fatalf("expected 201 Created, got %d", w.Code)
 		}
-		var resp map[string]string
+		var resp api.RegisterResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if resp["token"] == "" {
+		if resp.Token == "" {
 			t.Error("expected token in response")
 		}
 	})
 
 	t.Run("Duplicate username returns 409", func(t *testing.T) {
-		data := map[string]string{
-			"username": "testuser",
-			"password": "anotherpass",
+		data := api.UserLogin{
+			Username: "testuser",
+			Password: "anotherpass",
 		}
 		body, _ := json.Marshal(data)
 		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
@@ -1019,9 +1033,9 @@ func TestRegisterHandler(t *testing.T) {
 	})
 
 	t.Run("Too short password returns 400", func(t *testing.T) {
-		data := map[string]string{
-			"username": "shortpass",
-			"password": "123",
+		data := api.UserLogin{
+			Username: "shortpass",
+			Password: "123",
 		}
 		body, _ := json.Marshal(data)
 		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
@@ -1334,18 +1348,18 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp map[string]any
+		var resp api.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		imported := int(resp["imported"].(float64))
+		imported := resp.ImportedProductsCount
 
 		if imported != 2 {
 			t.Errorf("expected 2 imported products, got %d", imported)
 		}
-		if resp["errors"] != nil {
-			t.Errorf("expected no errors, got %d", resp["errors"])
+		if len(resp.Errors) != 0 {
+			t.Errorf("expected no errors, got %v", resp.Errors)
 		}
 	})
 
@@ -1374,25 +1388,25 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp map[string]any
+		var resp api.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		imported := int(resp["imported"].(float64))
-		errors := resp["errors"].([]any)
+		imported := resp.ImportedProductsCount
+		errors := resp.Errors
 
 		if imported != 2 {
 			t.Errorf("expected 2 imported products, got %d", imported)
 		}
 		if len(errors) != 1 {
 			t.Errorf("expected 1 error, got %d", len(errors))
-		} else if !strings.Contains(errors[0].(string), "row 3") {
+		} else if !strings.Contains(resp.Errors[0].Description, "row 3") {
 			t.Errorf("expected error for row 3, got %v", errors[0])
 		}
 
 		wanterrorContains := "invalid values"
-		if !strings.Contains(errors[0].(string), wanterrorContains) {
+		if !strings.Contains(resp.Errors[0].Description, wanterrorContains) {
 			t.Errorf("expected first error to constains %s , got %s", wanterrorContains, errors[0])
 		}
 	})
@@ -1422,24 +1436,21 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp map[string]any
+		var resp api.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		imported := int(resp["imported"].(float64))
-		errors := resp["errors"].([]any)
-
-		if imported != 2 {
-			t.Errorf("expected 2 imported products, got %d", imported)
+		if resp.ImportedProductsCount != 2 {
+			t.Errorf("expected 2 imported products, got %d", resp.ImportedProductsCount)
 		}
-		if len(errors) != 1 {
-			t.Errorf("expected 1 error, got %d", len(errors))
+		if len(resp.Errors) != 1 {
+			t.Errorf("expected 1 error, got %d", len(resp.Errors))
 		}
 
 		wantErrorContains := "already exists"
-		if !strings.Contains(errors[0].(string), wantErrorContains) {
-			t.Errorf("expected error to constains %s , got %s", wantErrorContains, errors[0])
+		if !strings.Contains(resp.Errors[0].Description, wantErrorContains) {
+			t.Errorf("expected error to constains %s , got %s", wantErrorContains, resp.Errors[0].Description)
 		}
 	})
 
@@ -1468,23 +1479,21 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp map[string]any
+		var resp api.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		imported := int(resp["imported"].(float64))
-		errors := resp["errors"].([]any)
-
-		if imported != 2 {
-			t.Errorf("expected 2 imported products, got %d", imported)
+		if resp.ImportedProductsCount != 2 {
+			t.Errorf("expected 2 imported products, got %d", resp.ImportedProductsCount)
 		}
+		errors := resp.Errors
 		if len(errors) != 1 {
 			t.Errorf("expected 1 error, got %d", len(errors))
 		}
 
 		wantErrorContains := "already exists"
-		if !strings.Contains(errors[0].(string), wantErrorContains) {
+		if !strings.Contains(errors[0].Description, wantErrorContains) {
 			t.Errorf("expected error to constains %s , got %s", wantErrorContains, errors[0])
 		}
 	})
@@ -1492,7 +1501,7 @@ Keyboard,45.00,5,1`
 	t.Run("Import with update mode replaces product", func(t *testing.T) {
 		// Create a product to update
 		original := api.ProductRequest{Name: "Monitor", Price: 200.0, Quantity: 5, Threshold: 2}
-		w := createProduct(r, original)
+		createProduct(r, original)
 
 		// Import CSV with same product name but new values
 		csv := `name,price,quantity,threshold
@@ -1507,18 +1516,18 @@ Monitor,99.0,1,1`
 		req := httptest.NewRequest(http.MethodPost, "/products/import?mode=update", &buf)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+token)
-		w = httptest.NewRecorder()
+		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp map[string]any
+		var resp api.ImportProductsResult
 		json.NewDecoder(w.Body).Decode(&resp)
 
-		if int(resp["imported"].(float64)) != 1 {
-			t.Errorf("expected 1 update, got %v", resp["imported"])
+		if resp.ImportedProductsCount != 1 {
+			t.Errorf("expected 1 update, got %v", resp.ImportedProductsCount)
 		}
 
 		// Check updated product

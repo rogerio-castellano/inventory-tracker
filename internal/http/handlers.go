@@ -81,9 +81,7 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	validationErrors := validateProduct(req)
 	if len(validationErrors) > 0 {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]any{
-			"errors": validationErrors,
-		})
+		json.NewEncoder(w).Encode(validationErrors)
 		return
 	}
 
@@ -244,9 +242,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	validationErrors := validateProduct(req)
 	if len(validationErrors) > 0 {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]any{
-			"errors": validationErrors,
-		})
+		json.NewEncoder(w).Encode(validationErrors)
 		return
 	}
 
@@ -565,16 +561,21 @@ func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func validateProduct(p ProductRequest) map[string]string {
-	errs := make(map[string]string)
+type ProductValidationError struct {
+	Field       string `json:"field"`
+	Description string `json:"description"`
+}
+
+func validateProduct(p ProductRequest) []ProductValidationError {
+	errs := []ProductValidationError{}
 	if strings.TrimSpace(p.Name) == "" {
-		errs["name"] = "Name is required"
+		errs = append(errs, ProductValidationError{Field: "Name", Description: "Name is required"})
 	}
 	if p.Price <= 0 {
-		errs["price"] = "Price must be greater than zero"
+		errs = append(errs, ProductValidationError{Field: "Price", Description: "Price must be greater than zero"})
 	}
 	if p.Quantity < 0 {
-		errs["quantity"] = "Quantity cannot be negative"
+		errs = append(errs, ProductValidationError{Field: "Quantity", Description: "Quantity cannot be negative"})
 	}
 	return errs
 }
@@ -659,6 +660,15 @@ func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
 
 var userRepo repo.UserRepository
 
+type UserLogin struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type LoginResult struct {
+	Token string `json:"token"`
+}
+
 // LoginHandler godoc
 // @Summary Authenticate user and return JWT token
 // @Tags auth
@@ -670,23 +680,20 @@ var userRepo repo.UserRepository
 // @Failure 401 {string} string "Unauthorized"
 // @Router /login [post]
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	var creds struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+	userLogin := UserLogin{}
+	if err := json.NewDecoder(r.Body).Decode(&userLogin); err != nil {
 		http.Error(w, "invalid input", http.StatusBadRequest)
 		return
 	}
 
-	user, err := userRepo.GetByUsername(creds.Username)
+	user, err := userRepo.GetByUsername(userLogin.Username)
 
 	if err != nil {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
-	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(creds.Password)) != nil {
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(userLogin.Password)) != nil {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
@@ -697,11 +704,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	json.NewEncoder(w).Encode(LoginResult{Token: token})
 }
 
 func SetUserRepo(r repo.UserRepository) {
 	userRepo = r
+}
+
+type RegisterResult struct {
+	Message string `json:"message"`
+	Token   string `json:"token"`
 }
 
 // RegisterHandler godoc
@@ -758,9 +770,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "user registered",
-		"token":   token,
+	json.NewEncoder(w).Encode(RegisterResult{
+		Message: "user registered",
+		Token:   token,
 	})
 }
 
@@ -785,6 +797,11 @@ func GetDashboardMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(m)
+}
+
+type ImportProductsResult struct {
+	ImportedProductsCount int                      `json:"imported"`
+	Errors                []ProductValidationError `json:"errors"`
 }
 
 // ImportProductsHandler godoc
@@ -825,7 +842,7 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var imported int
-	var errorsList []string
+	var errorsList []ProductValidationError
 
 	for row := 2; ; row++ {
 		record, err := reader.Read()
@@ -833,7 +850,7 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			errorsList = append(errorsList, fmt.Sprintf("row %d: %v", row, err))
+			errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: %v", row, err)})
 			continue
 		}
 
@@ -843,7 +860,7 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 		threshold, _ := strconv.Atoi(record[headerIndex["threshold"]])
 
 		if strings.TrimSpace(name) == "" || price <= 0 || quantity < 0 || threshold < 0 {
-			errorsList = append(errorsList, fmt.Sprintf("row %d: invalid values", row))
+			errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: invalid values", row)})
 			continue
 		}
 
@@ -851,7 +868,7 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 		existing, err := productRepo.GetByName(name)
 		if err == nil && existing.ID != 0 {
 			if mode == "skip" {
-				errorsList = append(errorsList, fmt.Sprintf("row %d: product '%s' already exists", row, name))
+				errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: product '%s' already exists", row, name)})
 				continue
 			}
 		}
@@ -864,7 +881,7 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 
 			_, err = productRepo.Update(existing)
 			if err != nil {
-				errorsList = append(errorsList, fmt.Sprintf("row %d: failed to update '%s'", row, name))
+				errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: failed to update '%s'", row, name)})
 				continue
 			}
 			imported++
@@ -882,15 +899,15 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 
 		_, err = productRepo.Create(product)
 		if err != nil {
-			errorsList = append(errorsList, fmt.Sprintf("row %d: %v", row, err))
+			errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: %v", row, err)})
 			continue
 		}
 		imported++
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"imported": imported,
-		"errors":   errorsList,
+	json.NewEncoder(w).Encode(ImportProductsResult{
+		ImportedProductsCount: imported,
+		Errors:                errorsList,
 	})
 }
