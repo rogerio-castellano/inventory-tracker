@@ -66,6 +66,7 @@ type MovementsSearchResult struct {
 // @Tags products
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param product body http.ProductRequest true "Product to add"
 // @Success 201 {object} http.ProductResponse
 // @Failure 400 {object} map[string]string
@@ -190,6 +191,7 @@ func GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "Not found"
 // @Failure 500 {string} string "Internal error"
 // @Router /products/{id} [delete]
+// @Security BearerAuth
 func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id") // Use chi to get the path parameter
 	if idStr == "" {
@@ -224,6 +226,7 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "Not found"
 // @Failure 500 {string} string "Internal error"
 // @Router /products/{id} [put]
+// @Security BearerAuth
 func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -389,6 +392,7 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "Not found"
 // @Failure 500 {string} string "Internal error"
 // @Router /products/{id}/adjust [post]
+// @Security BearerAuth
 func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -794,6 +798,7 @@ func GetDashboardMetricsHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {string} string "Invalid file"
 // @Failure 500 {string} string "Internal error"
 // @Router /products/import [post]
+// @Security BearerAuth
 func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 	mode := strings.ToLower(r.URL.Query().Get("mode"))
 	if mode != "update" {

@@ -547,7 +547,7 @@ paths:
       tags:
       - auth
 securityDefinitions:
-  Bearer:
+  BearerAuth:
     in: header
     name: Authorization
     type: apiKey
