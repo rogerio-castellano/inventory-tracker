@@ -22,5 +22,5 @@ docker-test:
  	-v "$(PWD)":/app \
  	-w /app \
  	-e DATABASE_URL=postgres://postgres:example@host.docker.internal:5432/inventory?sslmode=disable \
- 	golang:1.24.4 \
+ 	golang:1.24 \
  	go test ./...
