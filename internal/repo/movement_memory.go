@@ -10,12 +10,8 @@ type InMemoryMovementRepository struct {
 	movements []models.Movement
 }
 
-func (r *InMemoryMovementRepository) AddMovement(productId int, delta int, createdAt time.Time) {
-	movement := models.Movement{
-		ProductID: productId,
-		Delta:     delta,
-		CreatedAt: createdAt.Format(time.RFC3339),
-	}
+func (r *InMemoryMovementRepository) AddMovement(movement models.Movement) {
+
 	r.movements = append(r.movements, movement)
 }
 

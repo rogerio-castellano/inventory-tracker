@@ -1,4 +1,4 @@
-package handlers_test_suite
+package handlers_integrated_test_suite
 
 import (
 	"bytes"

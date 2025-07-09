@@ -57,6 +57,10 @@ func clearAllProducts() {
 	productRepo.Clear()
 }
 
+func clearAllUsersExceptAdmin() {
+	//Not necessary with non-persistent storage
+}
+
 func generateToken(r http.Handler, username, password string) (string, error) {
 	payload := handler.UserLogin{Username: username, Password: password}
 	body, _ := json.Marshal(payload)
@@ -102,4 +106,8 @@ func multipartCSV(csvContent string, filename string) (*bytes.Buffer, string) {
 
 	writer.Close()
 	return &buf, writer.FormDataContentType()
+}
+
+func addMovement(movement models.Movement) {
+	movementRepo.AddMovement(movement)
 }
