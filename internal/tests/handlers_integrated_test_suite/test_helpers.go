@@ -40,7 +40,8 @@ func init() {
 }
 
 func setupTestRepos(password string) {
-	os.Setenv("DATABASE_URL", "postgres://postgres:example@localhost:5432/inventory_tests?sslmode=disable")
+	os.Setenv("TEST_DATABASE_URL", "postgres://postgres:example@localhost:5432/inventory_tests?sslmode=disable")
+	os.Setenv("GO_ENV", "test")
 
 	var err error
 	database, err = db.Connect()

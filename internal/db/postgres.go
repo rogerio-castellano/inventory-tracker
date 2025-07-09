@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -14,8 +15,15 @@ var DB *sql.DB
 
 func Connect() (*sql.DB, error) {
 	dsn := os.Getenv("DATABASE_URL")
+
+	if os.Getenv("GO_ENV") == "test" {
+		dsn = os.Getenv("TEST_DATABASE_URL")
+		log.Println("Set up for tests; using TEST_DATABASE_URL.")
+	}
+
 	if dsn == "" {
 		dsn = "postgres://postgres:example@localhost:5432/inventory?sslmode=disable"
+		log.Println("Environment variable DATABASE_URL not found; using default configuration.")
 	}
 
 	db, err := sql.Open("pgx", dsn)
