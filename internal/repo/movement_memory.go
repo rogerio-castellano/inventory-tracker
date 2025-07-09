@@ -38,31 +38,30 @@ func (r *InMemoryMovementRepository) Log(productID, delta int) error {
 }
 
 // GetByProductID returns all movements for a specific product, optionally filtered by date range and paginated
-func (r *InMemoryMovementRepository) GetByProductID(productID int, since, until *time.Time, limit, offset *int) ([]models.Movement, int, error) {
+func (r *InMemoryMovementRepository) GetByProductID(productID int, mf MovementFilter) ([]models.Movement, int, error) {
 	var filtered []models.Movement
 	for _, m := range r.movements {
 		if m.ProductID == productID {
-			if (since != nil && m.CreatedAt < since.Format(time.RFC3339)) ||
-				(until != nil && m.CreatedAt > until.Format(time.RFC3339)) {
+			if (mf.Since != nil && m.CreatedAt < mf.Since.Format(time.RFC3339)) ||
+				(mf.Until != nil && m.CreatedAt > mf.Until.Format(time.RFC3339)) {
 				continue
 			}
 			filtered = append(filtered, m)
 		}
 	}
 
-	if offset != nil && *offset > len(filtered) {
+	if mf.Offset != nil && *mf.Offset > len(filtered) {
 		return nil, 0, nil // If offset is greater than the number of filtered products, return empty slice
 	}
 
 	start := 0
+	if mf.Offset != nil {
+		start = clamp(*mf.Offset, 0, len(filtered))
+	}
+
 	end := len(filtered)
-	if (offset != nil && *offset > 0) || (limit != nil && *limit > 0) {
-		if offset != nil && *offset < len(filtered) {
-			start = *offset
-		}
-		if limit != nil && *limit > 0 && start+*limit < len(filtered) {
-			end = start + *limit
-		}
+	if mf.Limit != nil && *mf.Limit > 0 {
+		end = clamp(start+*mf.Limit, start, len(filtered))
 	}
 
 	return filtered[start:end], len(filtered), nil

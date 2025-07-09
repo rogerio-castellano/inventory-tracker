@@ -1,6 +1,8 @@
 package repo
 
-import "sort"
+import (
+	"sort"
+)
 
 type InMemoryMetricsRepository struct {
 	productRepo  ProductRepository
@@ -20,7 +22,7 @@ func (i *InMemoryMetricsRepository) GetDashboardMetrics() (Metrics, error) {
 
 	// Get total movements
 	for _, product := range products {
-		_, count, err := i.movementRepo.GetByProductID(product.ID, nil, nil, nil, nil)
+		_, count, err := i.movementRepo.GetByProductID(product.ID, MovementFilter{})
 		if err != nil {
 			return m, err
 		}
@@ -55,7 +57,7 @@ func (i *InMemoryMetricsRepository) GetDashboardMetrics() (Metrics, error) {
 	m.Top5Movers = make([]TopMover, 0, 5)
 
 	for _, product := range products {
-		_, count, err := i.movementRepo.GetByProductID(product.ID, nil, nil, nil, nil)
+		_, count, err := i.movementRepo.GetByProductID(product.ID, MovementFilter{})
 		if err != nil {
 			return m, err
 		}

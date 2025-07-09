@@ -94,9 +94,9 @@ func (r *PostgresProductRepository) Delete(id int) error {
 	return nil
 }
 
-func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, int, error) {
+func (r *PostgresProductRepository) Filter(pf ProductFilter) ([]models.Product, int, error) {
 
-	conditions, args, argIdx := filterConditions(name, minPrice, maxPrice, minQty, maxQty)
+	conditions, args, argIdx := filterConditions(pf)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -113,14 +113,14 @@ func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *floa
 	query += conditions
 	query += " ORDER BY id"
 
-	if limit != nil && *limit > 0 {
+	if pf.Limit != nil && *pf.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", argIdx)
-		args = append(args, limit)
+		args = append(args, pf.Limit)
 		argIdx++
 	}
-	if offset != nil && *offset > 0 {
+	if pf.Offset != nil && *pf.Offset > 0 {
 		query += fmt.Sprintf(" OFFSET $%d", argIdx)
-		args = append(args, offset)
+		args = append(args, pf.Offset)
 		argIdx++
 	}
 
@@ -142,34 +142,34 @@ func (r *PostgresProductRepository) Filter(name string, minPrice, maxPrice *floa
 	return products, totalCount, nil
 }
 
-func filterConditions(name string, minPrice, maxPrice *float64, minQty, maxQty *int) (string, []any, int) {
+func filterConditions(pf ProductFilter) (string, []any, int) {
 	query := ""
 	argIdx := 1
 	args := []any{}
 
-	if name != "" {
+	if pf.Name != "" {
 		query += fmt.Sprintf(" AND name ILIKE $%d", argIdx)
-		args = append(args, "%"+name+"%")
+		args = append(args, "%"+pf.Name+"%")
 		argIdx++
 	}
-	if minPrice != nil {
+	if pf.MinPrice != nil {
 		query += fmt.Sprintf(" AND price >= $%d", argIdx)
-		args = append(args, minPrice)
+		args = append(args, pf.MinPrice)
 		argIdx++
 	}
-	if maxPrice != nil {
+	if pf.MaxPrice != nil {
 		query += fmt.Sprintf(" AND price <= $%d", argIdx)
-		args = append(args, maxPrice)
+		args = append(args, pf.MaxPrice)
 		argIdx++
 	}
-	if minQty != nil {
+	if pf.MinQty != nil {
 		query += fmt.Sprintf(" AND quantity >= $%d", argIdx)
-		args = append(args, minQty)
+		args = append(args, pf.MinQty)
 		argIdx++
 	}
-	if maxQty != nil {
+	if pf.MaxQty != nil {
 		query += fmt.Sprintf(" AND quantity <= $%d", argIdx)
-		args = append(args, maxQty)
+		args = append(args, pf.MaxQty)
 		argIdx++
 	}
 

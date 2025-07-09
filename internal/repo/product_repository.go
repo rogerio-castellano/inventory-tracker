@@ -13,10 +13,20 @@ type ProductRepository interface {
 	GetByID(id int) (models.Product, error)
 	Update(product models.Product) (models.Product, error)
 	Delete(id int) error
-	Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, int, error)
+	Filter(pf ProductFilter) ([]models.Product, int, error)
 	AdjustQuantity(productId int, delta int) (models.Product, error)
 	GetByName(name string) (models.Product, error)
 }
 
 var ErrInvalidQuantityChange = errors.New("insufficient quantity or product not found")
 var ErrProductNotFound = errors.New("product not found")
+
+func clamp(n, min, max int) int {
+	if n < min {
+		return min
+	}
+	if n > max {
+		return max
+	}
+	return n
+}

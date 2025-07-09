@@ -54,54 +54,6 @@ Keyboard,45.00,5,1`
 		}
 	})
 
-	t.Run("File with one invalid product", func(t *testing.T) {
-		t.Cleanup(clearAllProducts)
-
-		// Create CSV data (2 valid, 1 invalid)
-		csvData := `name,price,quantity,threshold
-Mouse,25.99,10,2
-InvalidProduct,0,3,1
-Keyboard,45.00,5,1`
-
-		var buf bytes.Buffer
-		writer := multipart.NewWriter(&buf)
-		part, _ := writer.CreateFormFile("file", "products.csv")
-		part.Write([]byte(csvData))
-		writer.Close()
-
-		req := httptest.NewRequest(http.MethodPost, "/products/import", &buf)
-		req.Header.Set("Content-Type", writer.FormDataContentType())
-		req.Header.Set("Authorization", "Bearer "+token)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200 OK, got %d", w.Code)
-		}
-
-		var resp handler.ImportProductsResult
-		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
-		}
-
-		imported := resp.ImportedProductsCount
-		errors := resp.Errors
-
-		if imported != 2 {
-			t.Errorf("expected 2 imported products, got %d", imported)
-		}
-		if len(errors) != 1 {
-			t.Errorf("expected 1 error, got %d", len(errors))
-		} else if !strings.Contains(resp.Errors[0].Description, "row 3") {
-			t.Errorf("expected error for row 3, got %v", errors[0])
-		}
-
-		wanterrorContains := "invalid values"
-		if !strings.Contains(resp.Errors[0].Description, wanterrorContains) {
-			t.Errorf("expected first error to constains %s , got %s", wanterrorContains, errors[0])
-		}
-	})
-
 	t.Run("File with a duplicated product (Mouse) in default mode (skip)", func(t *testing.T) {
 		t.Cleanup(clearAllProducts)
 
@@ -238,4 +190,82 @@ Monitor,99.0,1,1`
 			}
 		}
 	})
+}
+
+func TestImportProductsHandler_InvalidFields(t *testing.T) {
+	r := api.NewRouter()
+
+	tests := []struct {
+		name           string
+		payload        string
+		expectedErrors []string
+	}{
+		{
+			name:           "Invalid price",
+			payload:        "InvalidPrice,0,3,1\n",
+			expectedErrors: []string{"invalid price"},
+		},
+		{
+			name:           "Invalid quantity",
+			payload:        "InvalidQuantity,1,-1,1\n",
+			expectedErrors: []string{"invalid quantity"},
+		},
+		{
+			name:           "Invalid threshold",
+			payload:        "InvalidPrice,1,0,-1\n",
+			expectedErrors: []string{"invalid threshold"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Cleanup(clearAllProducts)
+			csvData := `name,price,quantity,threshold
+Mouse,25.99,10,2
+Keyboard,45.00,5,1
+`
+			csvData += tt.payload
+
+			var buf bytes.Buffer
+			writer := multipart.NewWriter(&buf)
+			part, _ := writer.CreateFormFile("file", "products.csv")
+			part.Write([]byte(csvData))
+			writer.Close()
+
+			req := httptest.NewRequest(http.MethodPost, "/products/import", &buf)
+			req.Header.Set("Content-Type", writer.FormDataContentType())
+			req.Header.Set("Authorization", "Bearer "+token)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected 200 OK, got %d", w.Code)
+			}
+
+			var resp handler.ImportProductsResult
+			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+
+			imported := resp.ImportedProductsCount
+			errors := resp.Errors
+
+			if imported != 2 {
+				t.Errorf("expected 2 imported products, got %d", imported)
+			}
+			if len(errors) != 1 {
+				t.Errorf("expected 1 error, got %d", len(errors))
+			}
+
+			if !strings.Contains(resp.Errors[0].Description, "row 4") {
+				t.Errorf("expected error for row 4, got %v", errors[0])
+			}
+
+			wanterrorContains := tt.expectedErrors[0]
+			if !strings.Contains(resp.Errors[0].Description, wanterrorContains) {
+				t.Errorf("expected first error to constains %s , got %s", wanterrorContains, errors[0])
+			}
+
+		})
+	}
 }

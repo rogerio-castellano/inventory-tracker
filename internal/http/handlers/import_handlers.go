@@ -3,8 +3,10 @@ package handlers
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +14,81 @@ import (
 
 	models "github.com/rogerio-castellano/inventory-tracker/internal/models"
 )
+
+type csvRow struct {
+	Name      string
+	Price     float64
+	Quantity  int
+	Threshold int
+}
+
+func parseCSV(file multipart.File) ([]csvRow, error) {
+	reader := csv.NewReader(file)
+	headers, err := reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("invalid CSV header")
+	}
+
+	index := map[string]int{}
+	for i, h := range headers {
+		index[strings.ToLower(h)] = i
+	}
+
+	var rows []csvRow
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("CSV read error: %v", err)
+		}
+
+		row := csvRow{
+			Name:      record[index["name"]],
+			Price:     parseFloat(record[index["price"]]),
+			Quantity:  parseInt(record[index["quantity"]]),
+			Threshold: parseInt(record[index["threshold"]]),
+		}
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
+func validateRow(r csvRow) error {
+	if strings.TrimSpace(r.Name) == "" {
+		return errors.New("missing name")
+	}
+	if r.Price <= 0 {
+		return errors.New("invalid price")
+	}
+	if r.Quantity < 0 {
+		return errors.New("invalid quantity")
+	}
+	if r.Threshold < 0 {
+		return errors.New("invalid threshold")
+	}
+	return nil
+}
+
+func parseFloat(s string) float64 {
+	v, _ := strconv.ParseFloat(s, 64)
+	return v
+}
+
+func parseInt(s string) int {
+	v, _ := strconv.Atoi(s)
+	return v
+}
+
+func nowRFC3339() string {
+	return time.Now().Format(time.RFC3339)
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(v)
+}
 
 // ImportProductsHandler godoc
 // @Summary Import products via CSV
@@ -38,84 +115,57 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	reader := csv.NewReader(file)
-	headers, err := reader.Read()
+	records, err := parseCSV(file)
 	if err != nil {
-		http.Error(w, "invalid CSV header", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-
-	headerIndex := map[string]int{}
-	for i, h := range headers {
-		headerIndex[strings.ToLower(h)] = i
 	}
 
 	var imported int
 	var errorsList []ProductValidationError
 
-	for row := 2; ; row++ {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: %v", row, err)})
+	for i, rec := range records {
+		rowNum := i + 2 // header is row 1
+
+		if err := validateRow(rec); err != nil {
+			errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: %v", rowNum, err)})
 			continue
 		}
 
-		name := record[headerIndex["name"]]
-		price, _ := strconv.ParseFloat(record[headerIndex["price"]], 64)
-		quantity, _ := strconv.Atoi(record[headerIndex["quantity"]])
-		threshold, _ := strconv.Atoi(record[headerIndex["threshold"]])
-
-		if strings.TrimSpace(name) == "" || price <= 0 || quantity < 0 || threshold < 0 {
-			errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: invalid values", row)})
-			continue
-		}
-
-		// Check if product with same name exists
-		existing, err := productRepo.GetByName(name)
+		existing, err := productRepo.GetByName(rec.Name)
 		if err == nil && existing.ID != 0 {
 			if mode == "skip" {
-				errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: product '%s' already exists", row, name)})
+				errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: product '%s' already exists", rowNum, rec.Name)})
 				continue
 			}
-		}
-
-		if mode == "update" {
-			existing.Price = price
-			existing.Quantity = quantity
-			existing.Threshold = threshold
-			existing.UpdatedAt = time.Now().Format(time.RFC3339)
-
-			_, err = productRepo.Update(existing)
-			if err != nil {
-				errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: failed to update '%s'", row, name)})
+			existing.Price = rec.Price
+			existing.Quantity = rec.Quantity
+			existing.Threshold = rec.Threshold
+			existing.UpdatedAt = nowRFC3339()
+			if _, err := productRepo.Update(existing); err != nil {
+				errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: failed to update '%s'", rowNum, rec.Name)})
 				continue
 			}
 			imported++
 			continue
 		}
 
-		product := models.Product{
-			Name:      name,
-			Price:     price,
-			Quantity:  quantity,
-			Threshold: threshold,
-			CreatedAt: time.Now().Format(time.RFC3339),
-			UpdatedAt: time.Now().Format(time.RFC3339),
+		newProduct := models.Product{
+			Name:      rec.Name,
+			Price:     rec.Price,
+			Quantity:  rec.Quantity,
+			Threshold: rec.Threshold,
+			CreatedAt: nowRFC3339(),
+			UpdatedAt: nowRFC3339(),
 		}
-
-		_, err = productRepo.Create(product)
-		if err != nil {
-			errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: %v", row, err)})
+		if _, err := productRepo.Create(newProduct); err != nil {
+			errorsList = append(errorsList, ProductValidationError{Description: fmt.Sprintf("row %d: %v", rowNum, err)})
 			continue
 		}
 		imported++
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ImportProductsResult{
+	writeJSON(w, ImportProductsResult{
 		ImportedProductsCount: imported,
 		Errors:                errorsList,
 	})

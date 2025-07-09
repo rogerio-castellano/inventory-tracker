@@ -100,7 +100,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/http.ProductResponse"
+                                "$ref": "#/definitions/handlers.ProductResponse"
                             }
                         }
                     },
@@ -136,7 +136,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.ProductRequest"
+                            "$ref": "#/definitions/handlers.ProductRequest"
                         }
                     }
                 ],
@@ -144,7 +144,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductResponse"
+                            "$ref": "#/definitions/handlers.ProductResponse"
                         }
                     },
                     "400": {
@@ -271,7 +271,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductsSearchResult"
+                            "$ref": "#/definitions/handlers.ProductsSearchResult"
                         }
                     },
                     "400": {
@@ -311,7 +311,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductResponse"
+                            "$ref": "#/definitions/handlers.ProductResponse"
                         }
                     },
                     "400": {
@@ -364,7 +364,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.ProductRequest"
+                            "$ref": "#/definitions/handlers.ProductRequest"
                         }
                     }
                 ],
@@ -372,7 +372,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductResponse"
+                            "$ref": "#/definitions/handlers.ProductResponse"
                         }
                     },
                     "400": {
@@ -471,7 +471,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.QuantityAdjustmentRequest"
+                            "$ref": "#/definitions/handlers.QuantityAdjustmentRequest"
                         }
                     }
                 ],
@@ -479,7 +479,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductResponse"
+                            "$ref": "#/definitions/handlers.ProductResponse"
                         }
                     },
                     "400": {
@@ -549,7 +549,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.MovementsSearchResult"
+                            "$ref": "#/definitions/handlers.MovementsSearchResult"
                         }
                     },
                     "400": {
@@ -686,7 +686,7 @@
         }
     },
     "definitions": {
-        "http.Meta": {
+        "handlers.Meta": {
             "type": "object",
             "properties": {
                 "total_count": {
@@ -694,7 +694,7 @@
                 }
             }
         },
-        "http.MovementResponse": {
+        "handlers.MovementResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -711,21 +711,21 @@
                 }
             }
         },
-        "http.MovementsSearchResult": {
+        "handlers.MovementsSearchResult": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/http.MovementResponse"
+                        "$ref": "#/definitions/handlers.MovementResponse"
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/http.Meta"
+                    "$ref": "#/definitions/handlers.Meta"
                 }
             }
         },
-        "http.ProductRequest": {
+        "handlers.ProductRequest": {
             "type": "object",
             "properties": {
                 "id": {
@@ -745,7 +745,7 @@
                 }
             }
         },
-        "http.ProductResponse": {
+        "handlers.ProductResponse": {
             "type": "object",
             "properties": {
                 "id": {
@@ -768,21 +768,21 @@
                 }
             }
         },
-        "http.ProductsSearchResult": {
+        "handlers.ProductsSearchResult": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/http.ProductResponse"
+                        "$ref": "#/definitions/handlers.ProductResponse"
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/http.Meta"
+                    "$ref": "#/definitions/handlers.Meta"
                 }
             }
         },
-        "http.QuantityAdjustmentRequest": {
+        "handlers.QuantityAdjustmentRequest": {
             "type": "object",
             "properties": {
                 "delta": {

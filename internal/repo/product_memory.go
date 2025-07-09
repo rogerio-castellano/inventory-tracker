@@ -20,42 +20,47 @@ func NewInMemoryProductRepository() *InMemoryProductRepository {
 	}
 }
 
-// Filter implements ProductRepository.
-func (r *InMemoryProductRepository) Filter(name string, minPrice, maxPrice *float64, minQty, maxQty, offset, limit *int) ([]models.Product, int, error) {
+func matchesFilter(p models.Product, pf ProductFilter) bool {
+	if pf.Name != "" && !strings.Contains(strings.ToLower(p.Name), strings.ToLower(pf.Name)) {
+		return false
+	}
+	if pf.MinPrice != nil && p.Price < *pf.MinPrice {
+		return false
+	}
+	if pf.MaxPrice != nil && p.Price > *pf.MaxPrice {
+		return false
+	}
+	if pf.MinQty != nil && p.Quantity < *pf.MinQty {
+		return false
+	}
+	if pf.MaxQty != nil && p.Quantity > *pf.MaxQty {
+		return false
+	}
+	return true
+}
+
+func (r *InMemoryProductRepository) Filter(pf ProductFilter) ([]models.Product, int, error) {
 	var filtered []models.Product
 
 	for _, p := range r.products {
-		if name != "" && !strings.Contains(strings.ToLower(p.Name), strings.ToLower(name)) {
-			continue
+		if matchesFilter(p, pf) {
+			filtered = append(filtered, p)
 		}
-		if minPrice != nil && p.Price < *minPrice {
-			continue
-		}
-		if maxPrice != nil && p.Price > *maxPrice {
-			continue
-		}
-		if minQty != nil && p.Quantity < *minQty {
-			continue
-		}
-		if maxQty != nil && p.Quantity > *maxQty {
-			continue
-		}
-		filtered = append(filtered, p)
 	}
 
-	if offset != nil && *offset > len(filtered) {
-		return nil, 0, nil // If offset is greater than the number of filtered products, return empty slice
+	// If offset is greater than the number of filtered products, return empty slice
+	if pf.Offset != nil && *pf.Offset > len(filtered) {
+		return []models.Product{}, 0, nil
 	}
 
 	start := 0
+	if pf.Offset != nil {
+		start = clamp(*pf.Offset, 0, len(filtered))
+	}
+
 	end := len(filtered)
-	if (offset != nil && *offset > 0) || (limit != nil && *limit > 0) {
-		if offset != nil && *offset < len(filtered) {
-			start = *offset
-		}
-		if limit != nil && *limit > 0 && start+*limit < len(filtered) {
-			end = start + *limit
-		}
+	if pf.Limit != nil && *pf.Limit > 0 {
+		end = clamp(start+*pf.Limit, start, len(filtered))
 	}
 
 	return filtered[start:end], len(filtered), nil

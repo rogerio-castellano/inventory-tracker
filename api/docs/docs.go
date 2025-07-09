@@ -106,7 +106,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/http.ProductResponse"
+                                "$ref": "#/definitions/handlers.ProductResponse"
                             }
                         }
                     },
@@ -142,7 +142,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.ProductRequest"
+                            "$ref": "#/definitions/handlers.ProductRequest"
                         }
                     }
                 ],
@@ -150,7 +150,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductResponse"
+                            "$ref": "#/definitions/handlers.ProductResponse"
                         }
                     },
                     "400": {
@@ -277,7 +277,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductsSearchResult"
+                            "$ref": "#/definitions/handlers.ProductsSearchResult"
                         }
                     },
                     "400": {
@@ -317,7 +317,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductResponse"
+                            "$ref": "#/definitions/handlers.ProductResponse"
                         }
                     },
                     "400": {
@@ -370,7 +370,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.ProductRequest"
+                            "$ref": "#/definitions/handlers.ProductRequest"
                         }
                     }
                 ],
@@ -378,7 +378,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductResponse"
+                            "$ref": "#/definitions/handlers.ProductResponse"
                         }
                     },
                     "400": {
@@ -477,7 +477,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.QuantityAdjustmentRequest"
+                            "$ref": "#/definitions/handlers.QuantityAdjustmentRequest"
                         }
                     }
                 ],
@@ -485,7 +485,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.ProductResponse"
+                            "$ref": "#/definitions/handlers.ProductResponse"
                         }
                     },
                     "400": {
@@ -555,7 +555,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.MovementsSearchResult"
+                            "$ref": "#/definitions/handlers.MovementsSearchResult"
                         }
                     },
                     "400": {
@@ -692,7 +692,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "http.Meta": {
+        "handlers.Meta": {
             "type": "object",
             "properties": {
                 "total_count": {
@@ -700,7 +700,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.MovementResponse": {
+        "handlers.MovementResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -717,21 +717,21 @@ const docTemplate = `{
                 }
             }
         },
-        "http.MovementsSearchResult": {
+        "handlers.MovementsSearchResult": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/http.MovementResponse"
+                        "$ref": "#/definitions/handlers.MovementResponse"
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/http.Meta"
+                    "$ref": "#/definitions/handlers.Meta"
                 }
             }
         },
-        "http.ProductRequest": {
+        "handlers.ProductRequest": {
             "type": "object",
             "properties": {
                 "id": {
@@ -751,7 +751,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.ProductResponse": {
+        "handlers.ProductResponse": {
             "type": "object",
             "properties": {
                 "id": {
@@ -774,21 +774,21 @@ const docTemplate = `{
                 }
             }
         },
-        "http.ProductsSearchResult": {
+        "handlers.ProductsSearchResult": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/http.ProductResponse"
+                        "$ref": "#/definitions/handlers.ProductResponse"
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/http.Meta"
+                    "$ref": "#/definitions/handlers.Meta"
                 }
             }
         },
-        "http.QuantityAdjustmentRequest": {
+        "handlers.QuantityAdjustmentRequest": {
             "type": "object",
             "properties": {
                 "delta": {

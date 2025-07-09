@@ -1,5 +1,7 @@
 @url=http://localhost:8080
-@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE3MTEzODksInN1YiI6MSwidXNlcm5hbWUiOiJhZG1pbiJ9.YVx_xteDj_gMhHRYI5fWC5zrdr9Ngi6_QYOCMRaTdvA
+@product=34
+@since=2025-07-09T07:56:02Z
+@until=2025-07-09T07:56:08Z
 
 # Login with valid credentials
 POST {{url}}/login HTTP/1.1
@@ -11,52 +13,55 @@ Content-Type: application/json
 }
 
 ###
-GET {{url}}/products/4/movements HTTP/1.1
+GET {{url}}/products/{{product}}/movements HTTP/1.1
 
 ###
-GET {{url}}/products/4/movements?since=2025-07-03T19:50:00Z&until=2025-07-04T00:31:36Z HTTP/1.1
+GET {{url}}/products/{{product}}/movements?since={{since}}&until={{until}} HTTP/1.1
 
 ###
-GET {{url}}/products/4/movements?offset=1&limit=2 HTTP/1.1
+GET {{url}}/products/{{product}}/movements?offset=1&limit=2 HTTP/1.1
 
 ###
-GET {{url}}/products/4/movements?limit=1 HTTP/1.1
+GET {{url}}/products/{{product}}/movements?since={{since}}&until={{until}}&offset=1&limit=2 HTTP/1.1
+
+###
+GET {{url}}/products/{{product}}/movements?limit=1 HTTP/1.1
 
 ### Movements with zero limit should return only meta data
-GET {{url}}/products/4/movements?limit=0 HTTP/1.1
+GET {{url}}/products/{{product}}/movements?limit=0 HTTP/1.1
 
 ### Movements with invalid product ID
 GET {{url}}/products/1000/movements HTTP/1.1
 
 ### Movements with invalid since date
-GET {{url}}/products/4/movements?since=invalid-date&until=2025-07-04T00:31:36Z HTTP/1.1
+GET {{url}}/products/{{product}}/movements?since=invalid-date&until={{until}} HTTP/1.1
 
 ### Movements with invalid until date
-GET {{url}}/products/4/movements?since=2025-07-03T19:50:00Z&until=invalid-date HTTP/1.1
+GET {{url}}/products/{{product}}/movements?since={{since}}&until=invalid-date HTTP/1.1
 
 ### Movements with invalid limit
-GET {{url}}/products/4/movements?limit=invalid HTTP/1.1
+GET {{url}}/products/{{product}}/movements?limit=invalid HTTP/1.1
 
 ### Movements with invalid offset
-GET {{url}}/products/4/movements?offset=invalid HTTP/1.1
+GET {{url}}/products/{{product}}/movements?offset=invalid HTTP/1.1
 
 ### Movements with negative limit
-GET {{url}}/products/4/movements?limit=-1 HTTP/1.1
+GET {{url}}/products/{{product}}/movements?limit=-1 HTTP/1.1
 
 ### Movements with negative offset
-GET {{url}}/products/4/movements?offset=-1 HTTP/1.1
+GET {{url}}/products/{{product}}/movements?offset=-1 HTTP/1.1
 
 ### Movements with zero offset (should return all)
-GET {{url}}/products/4/movements?offset=0 HTTP/1.1
+GET {{url}}/products/{{product}}/movements?offset=0 HTTP/1.1
 
 ### Movements with limit greater than total count (should use the default limit instead)
-GET {{url}}/products/4/movements?limit=100 HTTP/1.1
+GET {{url}}/products/{{product}}/movements?limit=1000 HTTP/1.1
 
 ### Movements with large offset (should return only meta data)
-GET {{url}}/products/4/movements?offset=1000 HTTP/1.1
+GET {{url}}/products/{{product}}/movements?offset=1000 HTTP/1.1
 
 ### 
-GET {{url}}/products/4/movements/export?format=csv
+GET {{url}}/products/{{product}}/movements/export?format=csv
 
 ### 
-GET {{url}}/products/4/movements/export?format=json
+GET {{url}}/products/{{product}}/movements/export?format=json

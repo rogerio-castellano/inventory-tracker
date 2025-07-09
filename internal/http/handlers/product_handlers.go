@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -18,8 +19,8 @@ import (
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param product body http.ProductRequest true "Product to add"
-// @Success 201 {object} http.ProductResponse
+// @Param product body ProductRequest true "Product to add"
+// @Success 201 {object} ProductResponse
 // @Failure 400 {object} map[string]string
 // @Router /products [post]
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
@@ -227,6 +228,28 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+func parseFloatPtr(s string) *float64 {
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return nil
+	}
+	return &v
+}
+
+func parseIntPtr(s string) *int {
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return nil
+	}
+	return &v
+}
+
 // FilterProductsHandler godoc
 // @Summary Filter and paginate products
 // @Tags products
@@ -243,86 +266,51 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {string} string "Internal error"
 // @Router /products/search [get]
 func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
+	q := r.URL.Query()
 
-	name := query.Get("name")
-
-	var (
-		minPrice, maxPrice            *float64
-		minQty, maxQty, offset, limit *int
-	)
-
-	if v := query.Get("minPrice"); v != "" {
-		if val, err := strconv.ParseFloat(v, 64); err == nil {
-			minPrice = &val
-		}
-	}
-	if v := query.Get("maxPrice"); v != "" {
-		if val, err := strconv.ParseFloat(v, 64); err == nil {
-			maxPrice = &val
-		}
-	}
-	if v := query.Get("minQty"); v != "" {
-		if val, err := strconv.Atoi(v); err == nil {
-			minQty = &val
-		}
-	}
-	if v := query.Get("maxQty"); v != "" {
-		if val, err := strconv.Atoi(v); err == nil {
-			maxQty = &val
-		}
+	filter := repo.ProductFilter{
+		Name:     q.Get("name"),
+		MinPrice: parseFloatPtr(q.Get("minPrice")),
+		MaxPrice: parseFloatPtr(q.Get("maxPrice")),
+		MinQty:   parseIntPtr(q.Get("minQty")),
+		MaxQty:   parseIntPtr(q.Get("maxQty")),
+		Offset:   parseIntPtr(q.Get("offset")),
+		Limit:    parseIntPtr(q.Get("limit")),
 	}
 
-	if v := query.Get("offset"); v != "" {
-		if val, err := strconv.Atoi(v); err == nil {
-			offset = &val
-		}
+	if filter.Limit != nil && *filter.Limit <= 0 {
+		http.Error(w, "limit must be greater than zero", http.StatusBadRequest)
+		return
+	}
+	if filter.Offset != nil && *filter.Offset < 0 {
+		http.Error(w, "offset must be zero or positive", http.StatusBadRequest)
+		return
 	}
 
-	if v := query.Get("limit"); v != "" {
-		if val, err := strconv.Atoi(v); err == nil {
-			limit = &val
-		}
-	}
-
-	if v := query.Get("limit"); v != "" {
-		if val, err := strconv.Atoi(v); err != nil || val <= 0 {
-			http.Error(w, "invalid limit", http.StatusBadRequest)
-			return
-		} else {
-			limit = &val
-		}
-	}
-
-	if v := query.Get("offset"); v != "" {
-		if val, err := strconv.Atoi(v); err != nil || val < 0 {
-			http.Error(w, "invalid offset", http.StatusBadRequest)
-			return
-		} else {
-			offset = &val
-		}
-	}
-
-	products, totalCount, err := productRepo.Filter(name, minPrice, maxPrice, minQty, maxQty, offset, limit)
+	products, total, err := productRepo.Filter(filter)
 	if err != nil {
 		http.Error(w, "could not filter products", http.StatusInternalServerError)
 		return
 	}
 
-	var response ProductsSearchResult
-	for _, p := range products {
-		response.Data = append(response.Data, ProductResponse{
+	resp := ProductsSearchResult{
+		Data: make([]ProductResponse, len(products)),
+		Meta: Meta{TotalCount: total},
+	}
+	for i, p := range products {
+		resp.Data[i] = ProductResponse{
 			Id:        p.ID,
 			Name:      p.Name,
 			Price:     p.Price,
 			Quantity:  p.Quantity,
 			Threshold: p.Threshold,
 			LowStock:  p.Quantity < p.Threshold,
-		})
+		}
 	}
 
-	response.Meta.TotalCount = totalCount
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("failed to encode response: %v", err)
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+	}
 }

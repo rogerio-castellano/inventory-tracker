@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -71,6 +72,41 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func parseID(idStr string) (int, error) {
+	return strconv.Atoi(idStr)
+}
+
+func parseTime(raw string) (*time.Time, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	raw = fixRFC3339(raw)
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		log.Printf("invalid time: %s", raw)
+		return nil, err
+	}
+	return &t, nil
+}
+
+func fixRFC3339(s string) string {
+	if len(s) == len(time.RFC3339) && s[len(s)-6] == ' ' {
+		return s[:len(s)-6] + "+" + s[len(s)-5:]
+	}
+	return s
+}
+
+func parseNonNegativeInt(s string) (*int, error) {
+	if s == "" {
+		return nil, nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 0 {
+		return nil, fmt.Errorf("invalid non-negative int: %s", s)
+	}
+	return &v, nil
+}
+
 // GetMovementsHandler godoc
 // @Summary Get product movement logs
 // @Tags movements
@@ -86,106 +122,57 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {string} string "Internal error"
 // @Router /products/{id}/movements [get]
 func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idStr)
+	id, err := parseID(chi.URLParam(r, "id"))
 	if err != nil {
 		http.Error(w, "invalid product ID", http.StatusBadRequest)
 		return
 	}
 
-	// Validate the product ID
-	_, err = productRepo.GetByID(id)
-	if err != nil {
+	if _, err := productRepo.GetByID(id); err != nil {
+		status := http.StatusInternalServerError
 		if err == repo.ErrProductNotFound {
-			http.Error(w, "product not found", http.StatusNotFound)
-			return
+			status = http.StatusNotFound
 		}
-	}
-
-	sinceStr := r.URL.Query().Get("since")
-	untilStr := r.URL.Query().Get("until")
-
-	// Reverse the substitution from + for space in the date parameters, otherwise
-	// time.Parse will fail with an error.
-	// This is necessary because URL query parameters replace + with a space.
-	// Example: 2025-07-03T17:44:03+02:00 becomes 2025-07-03T17:44:03 02:00 on r.URL.Query().Get()
-	if len(sinceStr) == len(time.RFC3339) && sinceStr[len(sinceStr)-6] == ' ' {
-		sinceStr = sinceStr[:len(sinceStr)-6] + "+" + sinceStr[len(sinceStr)-5:]
-	}
-	if len(untilStr) == len(time.RFC3339) && untilStr[len(untilStr)-6] == ' ' {
-		untilStr = untilStr[:len(untilStr)-6] + "+" + untilStr[len(untilStr)-5:]
-	}
-
-	var since, until *time.Time
-	if sinceStr != "" {
-		if ts, err := time.Parse(time.RFC3339, sinceStr); err == nil {
-			since = &ts
-		} else {
-			log.Printf("could not parse since date %s: %v", sinceStr, err)
-			http.Error(w, "invalid since date format", http.StatusBadRequest)
-			return
-		}
-	}
-	if untilStr != "" {
-		if ts, err := time.Parse(time.RFC3339, untilStr); err == nil {
-			until = &ts
-		} else {
-			log.Printf("could not parse until date %s: %v", untilStr, err)
-			http.Error(w, "invalid until date format", http.StatusBadRequest)
-			return
-		}
-	}
-
-	var limit, offset *int
-
-	limitStr := r.URL.Query().Get("limit")
-	if limitStr != "" {
-		if v, err := strconv.Atoi(limitStr); err == nil {
-			limit = &v
-		} else {
-			log.Printf("could not parse limit %s: %v", limitStr, err)
-			http.Error(w, "invalid limit format", http.StatusBadRequest)
-			return
-		}
-	}
-
-	if limit != nil && *limit <= 0 {
-		log.Printf("invalid limit %d, must be greater than zero", *limit)
-		http.Error(w, "limit must be greater than zero", http.StatusBadRequest)
+		http.Error(w, "product not found", status)
 		return
 	}
 
-	offsetStr := r.URL.Query().Get("offset")
-	if offsetStr != "" {
-		if v, err := strconv.Atoi(offsetStr); err == nil {
-			offset = &v
-		} else {
-			log.Printf("could not parse offset %s: %v", offsetStr, err)
-			http.Error(w, "invalid offset format", http.StatusBadRequest)
-			return
-		}
-	}
-
-	if offset != nil && *offset < 0 {
-		log.Printf("invalid offset %d, must be zero or positive", *offset)
-		http.Error(w, "offset must be zero or positive", http.StatusBadRequest)
-		return
-	}
-
-	movements, total, err := movementRepo.GetByProductID(id, since, until, limit, offset)
-
+	q := r.URL.Query()
+	since, err := parseTime(q.Get("since"))
 	if err != nil {
-		log.Printf("could not retrieve movements for product %d: %v", id, err)
+		http.Error(w, "invalid since date format", http.StatusBadRequest)
+		return
+	}
+	until, err := parseTime(q.Get("until"))
+	if err != nil {
+		http.Error(w, "invalid until date format", http.StatusBadRequest)
+		return
+	}
+
+	limit, err := parseNonNegativeInt(q.Get("limit"))
+	if err != nil {
+		http.Error(w, "invalid limit format", http.StatusBadRequest)
+		return
+	}
+	offset, err := parseNonNegativeInt(q.Get("offset"))
+	if err != nil {
+		http.Error(w, "invalid offset format", http.StatusBadRequest)
+		return
+	}
+
+	movements, total, err := movementRepo.GetByProductID(id, repo.MovementFilter{Since: since, Until: until, Offset: offset, Limit: limit})
+	if err != nil {
+		log.Printf("failed to retrieve movements for product %d: %v", id, err)
 		http.Error(w, "could not retrieve movements", http.StatusInternalServerError)
 		return
 	}
-	response := MovementsSearchResult{
+
+	resp := MovementsSearchResult{
 		Data: make([]MovementResponse, len(movements)),
 		Meta: Meta{TotalCount: total},
 	}
-
 	for i, m := range movements {
-		response.Data[i] = MovementResponse{
+		resp.Data[i] = MovementResponse{
 			ID:        m.ID,
 			ProductID: m.ProductID,
 			Delta:     m.Delta,
@@ -194,7 +181,10 @@ func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("failed to encode response: %v", err)
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // ExportMovementsHandler godoc
@@ -216,36 +206,25 @@ func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid product ID", http.StatusBadRequest)
 		return
 	}
-
-	format := r.URL.Query().Get("format")
+	q := r.URL.Query()
+	format := q.Get("format")
 	if format != "csv" && format != "json" {
 		http.Error(w, "format must be 'csv' or 'json'", http.StatusBadRequest)
 		return
 	}
 
-	sinceStr := r.URL.Query().Get("since")
-	untilStr := r.URL.Query().Get("until")
-
-	if len(sinceStr) == len(time.RFC3339) && sinceStr[len(sinceStr)-6] == ' ' {
-		sinceStr = sinceStr[:len(sinceStr)-6] + "+" + sinceStr[len(sinceStr)-5:]
+	since, err := parseTime(q.Get("since"))
+	if err != nil {
+		http.Error(w, "invalid since date format", http.StatusBadRequest)
+		return
 	}
-	if len(untilStr) == len(time.RFC3339) && untilStr[len(untilStr)-6] == ' ' {
-		untilStr = untilStr[:len(untilStr)-6] + "+" + untilStr[len(untilStr)-5:]
-	}
-
-	var since, until *time.Time
-	if sinceStr != "" {
-		if ts, err := time.Parse(time.RFC3339, sinceStr); err == nil {
-			since = &ts
-		}
-	}
-	if untilStr != "" {
-		if ts, err := time.Parse(time.RFC3339, untilStr); err == nil {
-			until = &ts
-		}
+	until, err := parseTime(q.Get("until"))
+	if err != nil {
+		http.Error(w, "invalid until date format", http.StatusBadRequest)
+		return
 	}
 
-	movements, _, err := movementRepo.GetByProductID(id, since, until, nil, nil)
+	movements, _, err := movementRepo.GetByProductID(id, repo.MovementFilter{Since: since, Until: until})
 	if err != nil {
 		http.Error(w, "could not retrieve movements", http.StatusInternalServerError)
 		return

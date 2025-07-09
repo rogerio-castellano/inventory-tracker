@@ -16,10 +16,10 @@ Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-    "name": "Book",
-    "price": 1.23,
-    "quantity": 1,
-    "threshold": 2
+    "name": "100 Go Mistakes and How to Avoid Them",
+    "price": 12.34,
+    "quantity": 10,
+    "threshold": 5
 }
 
 ###
@@ -33,59 +33,24 @@ DELETE {{url}}/products/5 HTTP/1.1
 Authorization: Bearer {{token}}
 
 ###
-PUT {{url}}/products/7 HTTP/1.1
+PUT {{url}}/products/2 HTTP/1.1
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-    "id" : 7,
     "name": "Go Programming Language",
-    "price": 4.44,
+    "price": 11.11,
     "quantity": 11,
     "threshold": 12
 }
 
 ### Filter products
+GET {{url}}/products/filter?name=o&minQty=1&maxQty=40&minPrice=1&maxPrice=20 HTTP/1.1
+
 GET {{url}}/products/filter?name=o&minQty=2&maxQty=4&minPrice=1&maxPrice=4.44 HTTP/1.1
 
 ###
 GET {{url}}/products/filter?offset=1&limit=2 HTTP/1.1
-
-
-### Adjust quantity
-POST {{url}}/products/4/adjust HTTP/1.1
-Content-Type: application/json
-Authorization: Bearer {{token}}
-
-{
-    "delta": 2
-}
-
-### 
-POST {{url}}/products/4/adjust HTTP/1.1
-Content-Type: application/json
-Authorization: Bearer {{token}}
-
-{
-    "delta": -2
-}
-
-###
-POST {{url}}/products/4/adjust HTTP/1.1
-Content-Type: application/json
-Authorization: Bearer {{token}}
-
-{
-    "delta": -100
-}
-
-### 
-POST {{url}}/products/1000/adjust HTTP/1.1
-Content-Type: application/json
-
-{
-    "delta": -2
-}
 
 ###
 POST http://localhost:8080/products/import

@@ -1,11 +1,11 @@
 basePath: /
 definitions:
-  http.Meta:
+  handlers.Meta:
     properties:
       total_count:
         type: integer
     type: object
-  http.MovementResponse:
+  handlers.MovementResponse:
     properties:
       created_at:
         type: string
@@ -16,16 +16,16 @@ definitions:
       product_id:
         type: integer
     type: object
-  http.MovementsSearchResult:
+  handlers.MovementsSearchResult:
     properties:
       data:
         items:
-          $ref: '#/definitions/http.MovementResponse'
+          $ref: '#/definitions/handlers.MovementResponse'
         type: array
       meta:
-        $ref: '#/definitions/http.Meta'
+        $ref: '#/definitions/handlers.Meta'
     type: object
-  http.ProductRequest:
+  handlers.ProductRequest:
     properties:
       id:
         type: integer
@@ -38,7 +38,7 @@ definitions:
       threshold:
         type: integer
     type: object
-  http.ProductResponse:
+  handlers.ProductResponse:
     properties:
       id:
         type: integer
@@ -53,16 +53,16 @@ definitions:
       threshold:
         type: integer
     type: object
-  http.ProductsSearchResult:
+  handlers.ProductsSearchResult:
     properties:
       data:
         items:
-          $ref: '#/definitions/http.ProductResponse'
+          $ref: '#/definitions/handlers.ProductResponse'
         type: array
       meta:
-        $ref: '#/definitions/http.Meta'
+        $ref: '#/definitions/handlers.Meta'
     type: object
-  http.QuantityAdjustmentRequest:
+  handlers.QuantityAdjustmentRequest:
     properties:
       delta:
         description: can be positive or negative
@@ -168,7 +168,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/http.ProductResponse'
+              $ref: '#/definitions/handlers.ProductResponse'
             type: array
         "500":
           description: Internal error
@@ -187,14 +187,14 @@ paths:
         name: product
         required: true
         schema:
-          $ref: '#/definitions/http.ProductRequest'
+          $ref: '#/definitions/handlers.ProductRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/http.ProductResponse'
+            $ref: '#/definitions/handlers.ProductResponse'
         "400":
           description: Bad Request
           schema:
@@ -247,7 +247,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.ProductResponse'
+            $ref: '#/definitions/handlers.ProductResponse'
         "400":
           description: Invalid ID
           schema:
@@ -277,14 +277,14 @@ paths:
         name: product
         required: true
         schema:
-          $ref: '#/definitions/http.ProductRequest'
+          $ref: '#/definitions/handlers.ProductRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.ProductResponse'
+            $ref: '#/definitions/handlers.ProductResponse'
         "400":
           description: Bad Request
           schema:
@@ -318,14 +318,14 @@ paths:
         name: adjustment
         required: true
         schema:
-          $ref: '#/definitions/http.QuantityAdjustmentRequest'
+          $ref: '#/definitions/handlers.QuantityAdjustmentRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.ProductResponse'
+            $ref: '#/definitions/handlers.ProductResponse'
         "400":
           description: Invalid adjustment
           schema:
@@ -373,7 +373,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.MovementsSearchResult'
+            $ref: '#/definitions/handlers.MovementsSearchResult'
         "400":
           description: Invalid input
           schema:
@@ -501,7 +501,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.ProductsSearchResult'
+            $ref: '#/definitions/handlers.ProductsSearchResult'
         "400":
           description: Invalid query
           schema:
