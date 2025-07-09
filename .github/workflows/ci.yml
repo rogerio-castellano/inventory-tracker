@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Buffalo CLI
         run: |
-          go install github.com/gobuffalo/buffalo/cmd/buffalo@latest
+          go install github.com/gobuffalo/cli/cmd/buffalo@v0.18.14
           echo "$HOME/go/bin" >> $GITHUB_PATH
 
       - name: Install Soda CLI
