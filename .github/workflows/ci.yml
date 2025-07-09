@@ -8,7 +8,6 @@ on:
 
 env:
   GO_VERSION: "1.24"
-  POSTGRES_IMAGE: "postgres:latest"
 
 jobs:
   test:
@@ -16,7 +15,7 @@ jobs:
 
     services:
       postgres:
-        image: ${{ env.POSTGRES_IMAGE }}
+        image: postgres:latest
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: example
