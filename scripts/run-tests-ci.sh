@@ -34,7 +34,7 @@ soda migrate -e test
 # Reset test database for clean state
 log_info "Resetting test database for clean state..."
 soda drop -e test || true
-createdb -h localhost -U postgres app_test || true
+createdb -h localhost -U postgres inventory_tests || true
 soda migrate -e test
 
 # Run tests with coverage

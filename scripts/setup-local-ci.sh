@@ -25,9 +25,9 @@ if ! command -v soda &> /dev/null; then
 fi
 
 # Set environment variables
-export DATABASE_URL="postgres://postgres:postgres@localhost:5432/app_development?sslmode=disable"
-export TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5432/app_test?sslmode=disable"
-export PGPASSWORD="postgres"
+export DATABASE_URL="postgres://postgres:example@localhost:5432/inventory?sslmode=disable"
+export TEST_DATABASE_URL="postgres://postgres:example@localhost:5432/inventory_tests?sslmode=disable"
+export PGPASSWORD="example"
 export GO_ENV="test"
 
 # Run the same setup as CI
