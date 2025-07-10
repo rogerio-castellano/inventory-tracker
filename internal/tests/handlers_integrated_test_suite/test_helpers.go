@@ -165,6 +165,6 @@ func addMovement(m models.Movement) {
 
 	_, err := database.ExecContext(ctx, query, m.ProductID, m.Delta, m.CreatedAt, m.CreatedAt)
 	if err != nil {
-		fmt.Errorf("Error adding a movement %w", err)
+		log.Println("Error adding a movement %w", err)
 	}
 }
