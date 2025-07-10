@@ -84,7 +84,7 @@ jobs:
           PGPASSWORD: example
 
       - name: Build application
-        run: buffalo build --static -o bin/app
+        run: go build -o bin/app ./api
 
       - name: Upload test coverage
         uses: codecov/codecov-action@v3
