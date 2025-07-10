@@ -1,0 +1,78 @@
+name: Database Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to run migrations"
+        required: true
+        default: "development"
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      action:
+        description: "Migration action"
+        required: true
+        default: "migrate"
+        type: choice
+        options:
+          - migrate
+          - rollback
+          - status
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Install Soda CLI
+        run: |
+          go install github.com/gobuffalo/pop/v6/soda@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Create database config
+        run: |
+          cat > database.yml << EOF
+          ${{ github.event.inputs.environment }}:
+            dialect: postgres
+            database: \${{ secrets.DB_NAME }}
+            host: \${{ secrets.DB_HOST }}
+            port: \${{ secrets.DB_PORT }}
+            user: \${{ secrets.DB_USER }}
+            password: \${{ secrets.DB_PASSWORD }}
+            pool: 25
+            idle_pool: 5
+            max_conn_lifetime: 3600
+            sslmode: require
+          EOF
+
+      - name: Run migration
+        run: |
+          case "${{ github.event.inputs.action }}" in
+            migrate)
+              soda migrate -e ${{ github.event.inputs.environment }}
+              ;;
+            rollback)
+              soda migrate rollback -e ${{ github.event.inputs.environment }}
+              ;;
+            status)
+              soda migrate status -e ${{ github.event.inputs.environment }}
+              ;;
+          esac
+        env:
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
