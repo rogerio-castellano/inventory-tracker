@@ -45,4 +45,4 @@ bin/
 # Prevent committing sensitive config
 .env
 .env.*
-notes.txt
+zzz-ignore/
