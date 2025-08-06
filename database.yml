@@ -3,5 +3,5 @@ development:
   database: inventory
   user: postgres
   password: example
-  host: localhost
+  host: db
   port: 5432
