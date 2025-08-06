@@ -19,19 +19,16 @@ down: ## Stop all services
 	docker compose down
 
 logs: ## Show application logs
-	docker compose logs -f app
+	docker compose logs -f api
 
-migrate-dev: ## Run migrations for development
-	docker compose exec app soda migrate -e development
-
-migrate-test: ## Run migrations for test
-	docker compose exec app soda migrate -e test
+migrate-dev: ## Run migrations for inventory
+	docker compose exec api soda migrate -e inventory
 
 test: ## Run tests
-	docker compose exec app bash ./scripts/run-tests.sh
+	go test ./...
 
 setup: ## Setup databases and run migrations
-	docker compose exec app bash ./scripts/setup-db.sh
+	docker compose exec api bash ./scripts/setup-db.sh
 
 clean: ## Clean up containers and volumes
 	docker compose down -v
@@ -52,27 +49,3 @@ dev-setup: build up setup ## Complete development setup
 	@echo "Development environment is ready!"
 	@echo "App: http://localhost:3000"
 	@echo "pgAdmin: http://localhost:5050"
-
-
-# build:
-# 	go build -o $(APP_NAME) ./api/main.go
-
-# run:
-# 	go run ./api/main.go
-
-# test:
-# 	go test ./...
-
-# docker-build:
-# 	docker build -t $(IMAGE_NAME) .
-
-# docker-run:
-# 	docker-compose up --build
-
-# docker-test:
-# 	MSYS_NO_PATHCONV=1 docker run --rm \
-#  	-v "$(PWD)":/app \
-#  	-w /app \
-#  	-e DATABASE_URL=postgres://postgres:example@host.docker.internal:5432/inventory?sslmode=disable \
-#  	golang:1.24 \
-#  	go test ./...

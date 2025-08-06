@@ -46,7 +46,7 @@ log_success "PostgreSQL is ready!"
 # Create CI-specific database.yml
 log_info "Creating CI database configuration..."
 cat > database.yml << EOF
-development:
+inventory:
   dialect: postgres
   database: inventory
   host: localhost
@@ -82,13 +82,9 @@ run_soda_command() {
     fi
 }
 
-# Create development database
-log_info "Creating development database..."
-createdb -h localhost -U postgres inventory || log_warning "Development database might already exist"
-
-# Create test database (should already exist from service)
-# # log_info "Ensuring test database exists..."
-# # createdb -h localhost -U postgres inventory_tests || log_warning "Test database might already exist"
+# Create database
+log_info "Creating inventory database..."
+createdb -h localhost -U postgres inventory || log_warning "Inventory database might already exist"
 
 # Check if migrations directory exists
 if [ ! -d "migrations" ]; then
@@ -96,18 +92,18 @@ if [ ! -d "migrations" ]; then
     mkdir -p migrations
 fi
 
-# Run migrations for development
-run_soda_command "development" "migrate" "Running migrations for development environment"
+# Run migrations
+run_soda_command "inventory" "migrate" "Running migrations for inventory environment"
 
 # Run migrations for test
 # run_soda_command "test" "migrate" "Running migrations for test environment"
 
 # Verify database status
 log_info "Checking database status..."
-if soda schema -e development > /dev/null 2>&1; then
-    log_success "Development database is accessible"
+if soda schema -e inventory > /dev/null 2>&1; then
+    log_success "Inventory database is accessible"
 else
-    log_error "Development database is not accessible"
+    log_error "Inventory database is not accessible"
 fi
 
 # if soda schema -e test > /dev/null 2>&1; then

@@ -26,7 +26,6 @@ Thumbs.db
 # Docker
 **/pgdata/
 *.env
-docker-compose.override.yml
 
 # Swagger generated docs
 /docs/docs.go

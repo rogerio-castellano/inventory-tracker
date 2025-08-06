@@ -1,4 +1,4 @@
-development:
+inventory:
   dialect: postgres
   database: inventory
   user: postgres

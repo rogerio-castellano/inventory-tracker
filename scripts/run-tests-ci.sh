@@ -17,9 +17,9 @@ log_info "Running tests in CI environment..."
 
 # Migrate and reset DB
 log_info "Resetting database..."
-soda drop -e development || true
+soda drop -e inventory || true
 createdb -h localhost -U postgres inventory || true
-soda migrate -e development
+soda migrate -e inventory
 
 # Run Go tests with coverage
 log_info "Running Go tests with coverage..."

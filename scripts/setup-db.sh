@@ -75,24 +75,15 @@ if [ ! -d "migrations" ]; then
     mkdir -p migrations
 fi
 
-# Run migrations for development
-run_soda_command "development" "migrate" "Running migrations for development environment"
-
-# Run migrations for test
-run_soda_command "test" "migrate" "Running migrations for test environment"
+# Run migrations
+run_soda_command "inventory" "migrate" "Running migrations"
 
 # Verify database status
 log_info "Checking database status..."
-if soda schema -e development > /dev/null 2>&1; then
-    log_success "Development database is accessible"
+if soda schema -e inventory > /dev/null 2>&1; then
+    log_success "Inventory database is accessible"
 else
-    log_error "Development database is not accessible"
-fi
-
-if soda schema -e test > /dev/null 2>&1; then
-    log_success "Test database is accessible"
-else
-    log_error "Test database is not accessible"
+    log_error "Inventory database is not accessible"
 fi
 
 log_success "Database setup complete!"
