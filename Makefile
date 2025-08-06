@@ -10,8 +10,10 @@ help: ## Show this help
 
 # Docker commands
 build: ## Build the application
+	 $(MAKE) down
 	docker compose build
-
+	$(MAKE) up
+	
 up: ## Start all services
 	docker compose up -d
 
