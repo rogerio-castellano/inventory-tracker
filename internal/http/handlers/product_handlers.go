@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -47,6 +48,10 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	created, err := productRepo.Create(product)
 	if err != nil {
+		if strings.Contains(err.Error(), "23505") {
+			http.Error(w, "could not create product: product name duplicated", http.StatusInternalServerError)
+			return
+		}
 		http.Error(w, "could not create product", http.StatusInternalServerError)
 		return
 	}
