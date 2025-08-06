@@ -23,8 +23,8 @@ down: ## Stop all services
 logs: ## Show application logs
 	docker compose logs -f api
 
-migrate-dev: ## Run migrations for inventory
-	docker compose exec api soda migrate -e inventory
+migrate-dev: ## Run migrations for development
+	docker compose exec api soda migrate -e development
 
 test: ## Run tests
 	go test ./...

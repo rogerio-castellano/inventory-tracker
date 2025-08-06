@@ -1,7 +1,7 @@
-inventory:
+development:
   dialect: postgres
   database: inventory
   user: postgres
   password: example
-  host: db
+  host: localhost
   port: 5432

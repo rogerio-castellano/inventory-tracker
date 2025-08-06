@@ -46,7 +46,7 @@ log_success "PostgreSQL is ready!"
 # Create CI-specific database.yml
 log_info "Creating CI database configuration..."
 cat > database.yml << EOF
-inventory:
+development:
   dialect: postgres
   database: inventory
   host: localhost
@@ -93,10 +93,7 @@ if [ ! -d "migrations" ]; then
 fi
 
 # Run migrations
-run_soda_command "inventory" "migrate" "Running migrations for inventory environment"
-
-# Run migrations for test
-# run_soda_command "test" "migrate" "Running migrations for test environment"
+run_soda_command "development" "migrate" "Running migrations for development environment"
 
 # Verify database status
 log_info "Checking database status..."
