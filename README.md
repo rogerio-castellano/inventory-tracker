@@ -22,15 +22,16 @@ A full-featured backend service for managing products, stock levels, movement lo
 
 ## 🛠 Tech Stack
 
-| Layer     | Tech                                     |
-| --------- | ---------------------------------------- |
-| Language  | Go 1.24.4                                |
-| Router    | [Chi](https://github.com/go-chi/chi)     |
-| Database  | PostgreSQL                               |
-| Docs      | [Swaggo](https://github.com/swaggo/swag) |
-| Auth      | JWT                                      |
-| Container | Docker, Docker Compose                   |
-| Tests     | `go test`, Dockerized                    |
+| Layer      | Tech                                                      |
+| ---------- | --------------------------------------------------------- |
+| Language   | Go 1.24.4                                                 |
+| Router     | [Chi](https://github.com/go-chi/chi)                      |
+| Database   | PostgreSQL                                                |
+| Migrations | [Soda](https://gobuffalo.io/documentation/database/soda/) |
+| Docs       | [Swaggo](https://github.com/swaggo/swag)                  |
+| Auth       | JWT                                                       |
+| Container  | Docker, Docker Compose                                    |
+| Tests      | `go test`, Dockerized                                     |
 
 ---
 
