@@ -50,6 +50,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	user := models.User{
 		Username:     creds.Username,
 		PasswordHash: string(hashed),
+		Role:         "user",
 	}
 
 	_, err = userRepo.CreateUser(user)
@@ -63,7 +64,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate a token for the new user
-	token, err := auth.GenerateToken(user.ID, user.Username)
+	token, err := auth.GenerateToken(user)
 	if err != nil {
 		http.Error(w, "failed to generate token", http.StatusInternalServerError)
 		return
@@ -105,7 +106,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.GenerateToken(user.ID, user.Username)
+	token, err := auth.GenerateToken(user)
 	if err != nil {
 		http.Error(w, "could not generate token", http.StatusInternalServerError)
 		return

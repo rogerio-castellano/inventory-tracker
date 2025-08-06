@@ -1,3 +1,24 @@
 @url=http://localhost:8080
+@token=
 
+# Login with admin role credentials (authorized)
+POST {{url}}/login HTTP/1.1
+Content-Type: application/json
+
+{
+    "username": "admin",
+    "password": "secret"
+}
+
+### Login with user role credentials (unauthorized)
+POST {{url}}/login HTTP/1.1
+Content-Type: application/json
+
+{
+    "username" : "rogerio",
+    "password": "very-secret"
+}
+
+###
 GET {{url}}/metrics/dashboard HTTP/1.1
+Authorization: Bearer {{token}}

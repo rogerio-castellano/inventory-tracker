@@ -72,6 +72,7 @@ func createAdminIfNotExists(userRepo *repo.PostgresUserRepository, password stri
 		userRepo.CreateUser(models.User{
 			Username:     "admin",
 			PasswordHash: string(hash),
+			Role:         "admin",
 		})
 	}
 }

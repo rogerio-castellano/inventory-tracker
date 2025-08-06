@@ -22,16 +22,19 @@ func NewRouter() http.Handler {
 	r.Post("/login", handlers.LoginHandler)
 	r.Post("/register", handlers.RegisterHandler)
 
-	r.Get("/metrics/dashboard", handlers.GetDashboardMetricsHandler)
+	r.Route("/metrics", func(r chi.Router) {
+		r.Use(AuthMiddleware, RequireRole("admin"))
+		r.Get("/dashboard", handlers.GetDashboardMetricsHandler)
+	})
 
-	r.Group(func(protected chi.Router) {
-		protected.Use(AuthMiddleware)
+	r.Group(func(r chi.Router) {
+		r.Use(AuthMiddleware)
 
-		protected.Post("/products", handlers.CreateProductHandler)
-		protected.Put("/products/{id}", handlers.UpdateProductHandler)
-		protected.Delete("/products/{id}", handlers.DeleteProductHandler)
-		protected.Post("/products/{id}/adjust", handlers.AdjustQuantityHandler)
-		protected.Post("/products/import", handlers.ImportProductsHandler)
+		r.Post("/products", handlers.CreateProductHandler)
+		r.Put("/products/{id}", handlers.UpdateProductHandler)
+		r.Delete("/products/{id}", handlers.DeleteProductHandler)
+		r.Post("/products/{id}/adjust", handlers.AdjustQuantityHandler)
+		r.Post("/products/import", handlers.ImportProductsHandler)
 	})
 
 	r.Get("/swagger/*", httpSwagger.Handler(
