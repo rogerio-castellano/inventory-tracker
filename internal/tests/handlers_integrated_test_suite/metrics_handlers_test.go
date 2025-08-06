@@ -45,6 +45,7 @@ func TestDashboardMetricsHandler(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics/dashboard", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -105,6 +106,7 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics/dashboard", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

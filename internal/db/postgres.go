@@ -14,14 +14,14 @@ import (
 var DB *sql.DB
 
 func Connect() (*sql.DB, error) {
-	dsn := os.Getenv("DATABASE_URL")
+	dbUrl := os.Getenv("DATABASE_URL")
 
-	if dsn == "" {
-		dsn = "postgres://postgres:example@localhost:5432/inventory?sslmode=disable"
+	if dbUrl == "" {
+		dbUrl = "postgres://postgres:example@localhost:5432/inventory?sslmode=disable"
 		log.Println("Environment variable DATABASE_URL not found; using default configuration.")
 	}
 
-	db, err := sql.Open("pgx", dsn)
+	db, err := sql.Open("pgx", dbUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"time"
 
 	"github.com/rogerio-castellano/inventory-tracker/internal/db"
@@ -39,6 +40,10 @@ func init() {
 }
 
 func setupTestRepos(password string) {
+	dbUrl := os.Getenv("DATABASE_URL")
+	if dbUrl == "" {
+		os.Setenv("DATABASE_URL", "postgres://postgres:example@localhost:5432/inventory?sslmode=disable")
+	}
 	var err error
 	database, err = db.Connect()
 	if err != nil {
