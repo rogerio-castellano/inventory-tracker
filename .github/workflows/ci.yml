@@ -72,7 +72,6 @@ jobs:
         run: ./scripts/setup-db-ci.sh
         env:
           DATABASE_URL: postgres://postgres:example@localhost:5432/inventory?sslmode=disable
-          TEST_DATABASE_URL: postgres://postgres:example@localhost:5432/inventory_tests?sslmode=disable
           PGPASSWORD: example
 
       - name: Run tests
@@ -80,7 +79,6 @@ jobs:
         env:
           GO_ENV: test
           DATABASE_URL: postgres://postgres:example@localhost:5432/inventory?sslmode=disable
-          TEST_DATABASE_URL: postgres://postgres:example@localhost:5432/inventory_tests?sslmode=disable
           PGPASSWORD: example
 
       - name: Build application

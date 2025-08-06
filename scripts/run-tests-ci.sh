@@ -15,11 +15,11 @@ log_error()   { echo -e "${RED}❌ $1${NC}"; }
 
 log_info "Running tests in CI environment..."
 
-# Migrate and reset test DB
-log_info "Resetting test database..."
-soda drop -e test || true
-createdb -h localhost -U postgres inventory_tests || true
-soda migrate -e test
+# Migrate and reset DB
+log_info "Resetting database..."
+soda drop -e development || true
+createdb -h localhost -U postgres inventory || true
+soda migrate -e development
 
 # Run Go tests with coverage
 log_info "Running Go tests with coverage..."

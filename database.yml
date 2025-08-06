@@ -5,11 +5,3 @@ development:
   password: example
   host: localhost
   port: 5432
-
-tests:
-  dialect: postgres
-  database: inventory_tests
-  user: postgres
-  password: example
-  host: localhost
-  port: 5432

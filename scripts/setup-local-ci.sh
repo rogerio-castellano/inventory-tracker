@@ -26,7 +26,6 @@ fi
 
 # Set environment variables
 export DATABASE_URL="postgres://postgres:example@localhost:5432/inventory?sslmode=disable"
-export TEST_DATABASE_URL="postgres://postgres:example@localhost:5432/inventory_tests?sslmode=disable"
 export PGPASSWORD="example"
 export GO_ENV="test"
 

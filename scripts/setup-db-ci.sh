@@ -57,18 +57,6 @@ development:
   idle_pool: 2
   max_conn_lifetime: 3600
   sslmode: disable
-
-test:
-  dialect: postgres
-  database: inventory_tests
-  host: localhost
-  port: 5432
-  user: postgres
-  password: example
-  pool: 5
-  idle_pool: 2
-  max_conn_lifetime: 3600
-  sslmode: disable
 EOF
 
 # Function to run soda commands with error handling
@@ -99,8 +87,8 @@ log_info "Creating development database..."
 createdb -h localhost -U postgres inventory || log_warning "Development database might already exist"
 
 # Create test database (should already exist from service)
-log_info "Ensuring test database exists..."
-createdb -h localhost -U postgres inventory_tests || log_warning "Test database might already exist"
+# # log_info "Ensuring test database exists..."
+# # createdb -h localhost -U postgres inventory_tests || log_warning "Test database might already exist"
 
 # Check if migrations directory exists
 if [ ! -d "migrations" ]; then
@@ -112,7 +100,7 @@ fi
 run_soda_command "development" "migrate" "Running migrations for development environment"
 
 # Run migrations for test
-run_soda_command "test" "migrate" "Running migrations for test environment"
+# run_soda_command "test" "migrate" "Running migrations for test environment"
 
 # Verify database status
 log_info "Checking database status..."
@@ -122,10 +110,10 @@ else
     log_error "Development database is not accessible"
 fi
 
-if soda schema -e test > /dev/null 2>&1; then
-    log_success "Test database is accessible"
-else
-    log_error "Test database is not accessible"
-fi
+# if soda schema -e test > /dev/null 2>&1; then
+#     log_success "Test database is accessible"
+# else
+#     log_error "Test database is not accessible"
+# fi
 
 log_success "CI Database setup complete!"
