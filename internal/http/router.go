@@ -46,5 +46,7 @@ func NewRouter() http.Handler {
 		httpSwagger.URL("http://localhost:8080/swagger/doc.json"), //The url pointing to API definition
 	))
 
+	r.With(AuthMiddleware).Get("/me", handlers.MeHandler)
+
 	return r
 }

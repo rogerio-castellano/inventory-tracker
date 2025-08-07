@@ -66,3 +66,8 @@ type RegisterAsAdminRequest struct {
 	Password string `json:"password"`
 	Role     string `json:"role"` // e.g., "user" or "admin"
 }
+
+type MeResponse struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+}

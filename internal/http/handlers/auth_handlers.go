@@ -192,3 +192,30 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }
+
+// @Summary Get current user info
+// @Tags auth
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} MeResponse
+// @Failure 401 {string} string "Unauthorized"
+// @Router /me [get]
+func MeHandler(w http.ResponseWriter, r *http.Request) {
+
+	auth := r.Header.Get("Authorization")
+	_, claims, err := TokenClaims(auth)
+	if err != nil {
+		log.Printf("Error getting claims: %v", err)
+	}
+
+	resp := MeResponse{
+		Username: claims["username"].(string),
+		Role:     claims["role"].(string),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
+}
