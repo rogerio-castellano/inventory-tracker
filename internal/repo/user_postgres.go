@@ -37,6 +37,10 @@ func (r *PostgresUserRepository) CreateUser(u models.User) (models.User, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	if u.Role == "" {
+		u.Role = "user"
+	}
+
 	query := `INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id`
 	err := r.db.QueryRowContext(ctx, query, u.Username, u.PasswordHash, u.Role).Scan(&u.ID)
 	if err != nil {
