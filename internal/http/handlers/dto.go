@@ -42,11 +42,6 @@ type MovementsSearchResult struct {
 	Meta Meta               `json:"meta,omitempty"`
 }
 
-type UserLogin struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
 type LoginResult struct {
 	Token string `json:"token"`
 }

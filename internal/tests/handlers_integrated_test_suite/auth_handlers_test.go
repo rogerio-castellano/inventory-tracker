@@ -10,13 +10,14 @@ import (
 
 	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
 	handler "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 )
 
 func TestAuthFlow(t *testing.T) {
 	r := api.NewRouter()
 
 	t.Run("Login with valid credentials", func(t *testing.T) {
-		payload := handler.UserLogin{Username: "admin", Password: "secret"}
+		payload := models.Credentials{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
 		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 		w := httptest.NewRecorder()
@@ -51,7 +52,7 @@ func TestAuthFlow(t *testing.T) {
 
 	t.Run("Protected route with valid token succeeds", func(t *testing.T) {
 		t.Cleanup(clearAllProducts)
-		payload := handler.UserLogin{Username: "admin", Password: "secret"}
+		payload := models.Credentials{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
 		loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 		loginW := httptest.NewRecorder()
@@ -80,10 +81,7 @@ func TestRegisterHandler(t *testing.T) {
 
 	t.Run("Valid registration returns token", func(t *testing.T) {
 		t.Cleanup(clearAllUsersExceptAdmin)
-		data := handler.UserLogin{
-			Username: "testuser",
-			Password: "strongpassword",
-		}
+		data := models.Credentials{Username: "testuser", Password: "strongpassword"}
 		body, _ := json.Marshal(data)
 		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -104,10 +102,7 @@ func TestRegisterHandler(t *testing.T) {
 
 	t.Run("Duplicate username returns 409", func(t *testing.T) {
 		t.Cleanup(clearAllUsersExceptAdmin)
-		data := handler.UserLogin{
-			Username: "testuser",
-			Password: "anotherpass",
-		}
+		data := models.Credentials{Username: "testuser", Password: "anotherpass"}
 		body, _ := json.Marshal(data)
 
 		var w *httptest.ResponseRecorder
@@ -129,10 +124,8 @@ func TestRegisterHandler(t *testing.T) {
 	})
 
 	t.Run("Too short password returns 400", func(t *testing.T) {
-		data := handler.UserLogin{
-			Username: "shortpass",
-			Password: "123",
-		}
+		data := models.Credentials{Username: "shortpass",
+			Password: "123"}
 		body, _ := json.Marshal(data)
 		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
