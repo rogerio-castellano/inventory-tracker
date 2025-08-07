@@ -35,6 +35,10 @@ test: ## Run tests
 lint:
 	golangci-lint run
 
+.PHONY: docs
+docs:
+	swag init -g api/main.go
+
 setup: ## Setup databases and run migrations
 	docker compose exec api bash ./scripts/setup-db.sh
 
