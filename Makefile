@@ -13,7 +13,10 @@ build: ## Build the application
 	 $(MAKE) down
 	docker compose build
 	$(MAKE) up
-	
+
+build-go:	
+	go build ./api/main.go
+
 up: ## Start all services
 	docker compose up -d
 
