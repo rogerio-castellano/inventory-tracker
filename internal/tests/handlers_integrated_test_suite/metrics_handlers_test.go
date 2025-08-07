@@ -163,3 +163,20 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 		t.Errorf("expected Mouse as top mover with count 5, got %v", first)
 	}
 }
+
+func TestForbiddenAccessToNonAdminUser(t *testing.T) {
+	r := api.NewRouter()
+	userToken, err := userRoleToken(r)
+	if err != nil {
+		t.Fatalf("Error getting user token")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics/dashboard", nil)
+	req.Header.Set("Authorization", "Bearer "+userToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden, got %d", w.Code)
+	}
+}

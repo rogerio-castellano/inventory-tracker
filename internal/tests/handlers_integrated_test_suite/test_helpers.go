@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -25,6 +24,7 @@ var (
 	token        string
 	productRepo  *repo.PostgresProductRepository
 	movementRepo *repo.PostgresMovementRepository
+	userRepo     *repo.PostgresUserRepository
 	database     *sql.DB
 )
 
@@ -56,17 +56,16 @@ func setupTestRepos(password string) {
 	movementRepo = repo.NewPostgresMovementRepository(database)
 	handler.SetMovementRepo(movementRepo)
 
-	userRepo := repo.NewPostgresUserRepository(database)
+	userRepo = repo.NewPostgresUserRepository(database)
 	handler.SetUserRepo(userRepo)
 
-	createAdminIfNotExists(userRepo, password)
+	createAdminIfNotExists(password)
 
 	metricsRepo := repo.NewPostgresMetricsRepository(database)
 	handler.SetMetricsRepo(metricsRepo)
-	// metricsRepo.SetRepositories(productRepo, movementRepo)
 }
 
-func createAdminIfNotExists(userRepo *repo.PostgresUserRepository, password string) {
+func createAdminIfNotExists(password string) {
 	exists, err := userExists("admin")
 	if err != nil {
 		fmt.Println("error checking if admin exists", err)
@@ -80,6 +79,39 @@ func createAdminIfNotExists(userRepo *repo.PostgresUserRepository, password stri
 			Role:         "admin",
 		})
 	}
+}
+
+func userRoleToken(r http.Handler) (string, error) {
+	password := "secret-password"
+	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	user := models.User{
+		Username:     "UserRole",
+		PasswordHash: string(hash),
+	}
+	userRepo.CreateUser(user)
+
+	token, err := generateToken(r, user.Username, password)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+func generateToken(r http.Handler, username, password string) (string, error) {
+	payload := handler.UserLogin{Username: username, Password: password}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	var resp handler.LoginResult
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	if err != nil {
+		return "", fmt.Errorf("token decoding failed: %v", err)
+	}
+	return resp.Token, nil
 }
 
 func userExists(username string) (bool, error) {
@@ -113,22 +145,6 @@ func clearAllUsersExceptAdmin() {
 	}
 }
 
-func generateToken(r http.Handler, username, password string) (string, error) {
-	payload := handler.UserLogin{Username: username, Password: password}
-	body, _ := json.Marshal(payload)
-
-	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	var resp handler.LoginResult
-	err := json.NewDecoder(w.Body).Decode(&resp)
-	if err != nil {
-		return "", fmt.Errorf("token decoding failed: %v", err)
-	}
-	return resp.Token, nil
-}
-
 func createProduct(r http.Handler, p handler.ProductRequest) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(p)
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
@@ -147,17 +163,6 @@ func adjustProduct(r http.Handler, productID int, adj handler.QuantityAdjustment
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
-}
-
-func multipartCSV(csvContent string, filename string) (*bytes.Buffer, string) {
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-
-	part, _ := writer.CreateFormFile("file", filename)
-	part.Write([]byte(csvContent))
-
-	writer.Close()
-	return &buf, writer.FormDataContentType()
 }
 
 func addMovement(m models.Movement) {
