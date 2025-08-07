@@ -264,8 +264,10 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 		t.Fatalf("expected 201 Created, got %d", w.Code)
 	}
 	var created handler.ProductResponse
-	json.NewDecoder(w.Body).Decode(&created)
 
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	// Try invalid update
 	invalidUpdate := handler.ProductRequest{Name: "", Price: -100, Quantity: -1}
 	jsonInvalid, _ := json.Marshal(invalidUpdate)
@@ -329,7 +331,10 @@ func TestFilterProductsHandler(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 		var resp handler.ProductsSearchResult
-		json.NewDecoder(w.Body).Decode(&resp)
+
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if len(resp.Data) != 1 || !strings.Contains(strings.ToLower(resp.Data[0].Name), "phone") {
 			t.Errorf("expected one product containing 'phone', got %v", resp.Data)
 		}
@@ -344,7 +349,10 @@ func TestFilterProductsHandler(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 		var resp handler.ProductsSearchResult
-		json.NewDecoder(w.Body).Decode(&resp)
+
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		for _, p := range resp.Data {
 			price := p.Price
 			if price < 100 || price > 1000 {
@@ -362,7 +370,10 @@ func TestFilterProductsHandler(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 		var resp handler.ProductsSearchResult
-		json.NewDecoder(w.Body).Decode(&resp)
+
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		for _, p := range resp.Data {
 			qty := p.Quantity
 			if qty < 5 || qty > 20 {
@@ -380,7 +391,10 @@ func TestFilterProductsHandler(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 		var resp handler.ProductsSearchResult
-		json.NewDecoder(w.Body).Decode(&resp)
+
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if got := len(resp.Data); got != 0 {
 			t.Errorf("expected empty result, got %d items", got)
 		}

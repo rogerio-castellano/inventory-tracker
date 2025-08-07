@@ -34,7 +34,9 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	validationErrors := validateProduct(req)
 	if len(validationErrors) > 0 {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(validationErrors)
+		if err := json.NewEncoder(w).Encode(validationErrors); err != nil {
+			log.Printf("Failed to write JSON response: %v", err)
+		}
 		return
 	}
 
@@ -67,7 +69,9 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 // GetProductsHandler godoc
@@ -95,7 +99,9 @@ func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 // GetProductByIDHandler godoc
@@ -134,7 +140,9 @@ func GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
 		LowStock:  product.Quantity < product.Threshold,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 // DeleteProductHandler godoc
@@ -199,7 +207,9 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	validationErrors := validateProduct(req)
 	if len(validationErrors) > 0 {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(validationErrors)
+		if err := json.NewEncoder(w).Encode(validationErrors); err != nil {
+			log.Printf("Failed to write JSON response: %v", err)
+		}
 		return
 	}
 
@@ -230,7 +240,9 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		LowStock:  updated.Quantity < updated.Threshold,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 func parseFloatPtr(s string) *float64 {

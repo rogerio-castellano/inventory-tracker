@@ -59,26 +59,34 @@ func setupTestRepos(password string) {
 	userRepo = repo.NewPostgresUserRepository(database)
 	handler.SetUserRepo(userRepo)
 
-	createAdminIfNotExists(password)
+	if err := createAdminIfNotExists(password); err != nil {
+		log.Fatal("❌ Could not create admin user:", err)
+	}
 
 	metricsRepo := repo.NewPostgresMetricsRepository(database)
 	handler.SetMetricsRepo(metricsRepo)
 }
 
-func createAdminIfNotExists(password string) {
+func createAdminIfNotExists(password string) error {
 	exists, err := userExists("admin")
 	if err != nil {
-		fmt.Println("error checking if admin exists", err)
+		return err
 	}
 
 	if !exists {
 		hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-		userRepo.CreateUser(models.User{
+		_, err := userRepo.CreateUser(models.User{
 			Username:     "admin",
 			PasswordHash: string(hash),
 			Role:         "admin",
 		})
+
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func userRoleToken(r http.Handler) (string, error) {
@@ -88,7 +96,10 @@ func userRoleToken(r http.Handler) (string, error) {
 		Username:     "UserRole",
 		PasswordHash: string(hash),
 	}
-	userRepo.CreateUser(user)
+	_, err := userRepo.CreateUser(user)
+	if err != nil {
+		return "", err
+	}
 
 	token, err := generateToken(r, user.Username, password)
 	if err != nil {
@@ -107,8 +118,8 @@ func generateToken(r http.Handler, username, password string) (string, error) {
 	r.ServeHTTP(w, req)
 
 	var resp handler.LoginResult
-	err := json.NewDecoder(w.Body).Decode(&resp)
-	if err != nil {
+
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		return "", fmt.Errorf("token decoding failed: %v", err)
 	}
 	return resp.Token, nil

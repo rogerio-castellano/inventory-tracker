@@ -32,6 +32,9 @@ migrate-dev: ## Run migrations for development
 test: ## Run tests
 	go test ./...
 
+lint:
+	golangci-lint run
+
 setup: ## Setup databases and run migrations
 	docker compose exec api bash ./scripts/setup-db.sh
 

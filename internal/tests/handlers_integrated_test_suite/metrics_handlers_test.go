@@ -29,7 +29,9 @@ func TestDashboardMetricsHandler(t *testing.T) {
 		}
 		if p.Name == "Mouse" {
 			var resp handler.ProductResponse
-			json.NewDecoder(w.Body).Decode(&resp)
+			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
 			mouseID = resp.Id
 		}
 	}
@@ -94,7 +96,9 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 		}
 		if p.Name == "Mouse" {
 			var resp handler.ProductResponse
-			json.NewDecoder(w.Body).Decode(&resp)
+			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
 			mouseID = resp.Id
 		}
 	}

@@ -25,8 +25,14 @@ Keyboard,45.00,5,1`
 
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
-		part, _ := writer.CreateFormFile("file", "products.csv")
-		part.Write([]byte(csvData))
+		part, err := writer.CreateFormFile("file", "products.csv")
+		if err != nil {
+			t.Fatalf("fail to create form file %v: %v", "products.csv", err)
+		}
+		if _, err := part.Write([]byte(csvData)); err != nil {
+			t.Fatalf("fail to write file %v: %v", "products.csv", err)
+		}
+
 		writer.Close()
 
 		req := httptest.NewRequest(http.MethodPost, "/products/import", &buf)
@@ -66,7 +72,9 @@ Keyboard,45.00,5,1`
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
 		part, _ := writer.CreateFormFile("file", "products.csv")
-		part.Write([]byte(csvData))
+		if _, err := part.Write([]byte(csvData)); err != nil {
+			t.Fatalf("fail to write file %v: %v", "products.csv", err)
+		}
 		writer.Close()
 
 		req := httptest.NewRequest(http.MethodPost, "/products/import", &buf)
@@ -108,8 +116,13 @@ Keyboard,45.00,5,1`
 
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
-		part, _ := writer.CreateFormFile("file", "products.csv")
-		part.Write([]byte(csvData))
+		part, err := writer.CreateFormFile("file", "products.csv")
+		if err != nil {
+			t.Fatalf("fail to create form file %v: %v", "products.csv", err)
+		}
+		if _, err := part.Write([]byte(csvData)); err != nil {
+			t.Fatalf("fail to write file %v: %v", "products.csv", err)
+		}
 		writer.Close()
 
 		req := httptest.NewRequest(http.MethodPost, "/products/import?mode=skip", &buf)
@@ -153,8 +166,13 @@ Monitor,99.0,1,1`
 
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
-		part, _ := writer.CreateFormFile("file", "update.csv")
-		part.Write([]byte(csv))
+		part, err := writer.CreateFormFile("file", "update.csv")
+		if err != nil {
+			t.Fatalf("fail to create form file %v: %v", "products.csv", err)
+		}
+		if _, err := part.Write([]byte(csv)); err != nil {
+			t.Fatalf("fail to write file %v: %v", "products.csv", err)
+		}
 		writer.Close()
 
 		req := httptest.NewRequest(http.MethodPost, "/products/import?mode=update", &buf)
@@ -168,7 +186,9 @@ Monitor,99.0,1,1`
 		}
 
 		var resp handler.ImportProductsResult
-		json.NewDecoder(w.Body).Decode(&resp)
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("error decoding body: %v", err)
+		}
 
 		if resp.ImportedProductsCount != 1 {
 			t.Errorf("expected 1 update, got %v", resp.ImportedProductsCount)
@@ -180,7 +200,9 @@ Monitor,99.0,1,1`
 		r.ServeHTTP(getW, get)
 
 		var all []handler.ProductResponse
-		json.NewDecoder(getW.Body).Decode(&all)
+		if err := json.NewDecoder(getW.Body).Decode(&all); err != nil {
+			t.Fatalf("error decoding body: %v", err)
+		}
 
 		for _, p := range all {
 			if p.Name == "Monitor" {
@@ -228,8 +250,13 @@ Keyboard,45.00,5,1
 
 			var buf bytes.Buffer
 			writer := multipart.NewWriter(&buf)
-			part, _ := writer.CreateFormFile("file", "products.csv")
-			part.Write([]byte(csvData))
+			part, err := writer.CreateFormFile("file", "products.csv")
+			if err != nil {
+				t.Fatalf("fail to create form file %v: %v", "products.csv", err)
+			}
+			if _, err := part.Write([]byte(csvData)); err != nil {
+				t.Fatalf("fail to write file %v: %v", "products.csv", err)
+			}
 			writer.Close()
 
 			req := httptest.NewRequest(http.MethodPost, "/products/import", &buf)

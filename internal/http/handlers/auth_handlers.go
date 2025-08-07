@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -75,10 +76,14 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(RegisterResult{
+	err = json.NewEncoder(w).Encode(RegisterResult{
 		Message: "user registered",
 		Token:   token,
 	})
+
+	if err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 // @Summary Create user with custom role
@@ -138,9 +143,13 @@ func RegisterAsAdminHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	err = json.NewEncoder(w).Encode(map[string]string{
 		"message": "User created",
 	})
+
+	if err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 // LoginHandler godoc
@@ -177,5 +186,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(LoginResult{Token: token})
+	err = json.NewEncoder(w).Encode(LoginResult{Token: token})
+
+	if err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }

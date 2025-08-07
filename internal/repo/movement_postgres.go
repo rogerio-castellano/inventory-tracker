@@ -84,7 +84,6 @@ func (r *PostgresMovementRepository) buildWhereClause(productID int, mf Movement
 	if mf.Until != nil {
 		whereClause += fmt.Sprintf(" AND created_at <= $%d", argIndex)
 		args = append(args, *mf.Until)
-		argIndex++
 	}
 
 	return whereClause, args

@@ -67,9 +67,9 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 	if product.Quantity < product.Threshold {
 		resp.LowStock = true
 	}
-
-	json.NewEncoder(w).Encode(resp)
-
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 func parseID(idStr string) (int, error) {
@@ -234,8 +234,10 @@ func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
 	case "json":
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", `attachment; filename="movements.json"`)
-		json.NewEncoder(w).Encode(movements)
 
+		if err := json.NewEncoder(w).Encode(movements); err != nil {
+			log.Printf("Failed to write JSON response: %v", err)
+		}
 	case "csv":
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", `attachment; filename="movements.csv"`)

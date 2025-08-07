@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,7 +27,9 @@ func TestAdjustQuantityHandler(t *testing.T) {
 		t.Fatalf("failed to create product")
 	}
 	var created handler.ProductRequest
-	json.NewDecoder(w.Body).Decode(&created)
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 
 	t.Run("Increase quantity", func(t *testing.T) {
 		adj := handler.QuantityAdjustmentRequest{Delta: 5}
@@ -36,7 +39,9 @@ func TestAdjustQuantityHandler(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 		var resp handler.ProductResponse
-		json.NewDecoder(w.Body).Decode(&resp)
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if resp.Quantity != 15 {
 			t.Errorf("expected quantity 15, got %v", resp.Quantity)
 		}
@@ -50,7 +55,9 @@ func TestAdjustQuantityHandler(t *testing.T) {
 		}
 
 		var resp handler.ProductResponse
-		json.NewDecoder(w.Body).Decode(&resp)
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if resp.Quantity != 12.0 {
 			t.Errorf("expected quantity 12, got %v", resp.Quantity)
 		}
@@ -100,8 +107,10 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 		t.Fatalf("failed to create product")
 	}
 	var created handler.ProductResponse
-	json.NewDecoder(w.Body).Decode(&created)
 
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	// ❌ Try deducting more than available
 	t.Run("Reject over-deduction", func(t *testing.T) {
 		adj := handler.QuantityAdjustmentRequest{Delta: -10}
@@ -140,7 +149,10 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 		getW := httptest.NewRecorder()
 		r.ServeHTTP(getW, getReq)
 		var final handler.ProductResponse
-		json.NewDecoder(getW.Body).Decode(&final)
+
+		if err := json.NewDecoder(getW.Body).Decode(&final); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if final.Quantity < 0 {
 			t.Errorf("quantity should not go negative, got %d", final.Quantity)
 		}
@@ -157,8 +169,10 @@ func TestGetMovementsHandler(t *testing.T) {
 		t.Fatalf("failed to create product")
 	}
 	var created handler.ProductResponse
-	json.NewDecoder(w.Body).Decode(&created)
 
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	// Adjust quantity twice to generate movement log
 	adjust := func(delta int) {
 		adj := handler.QuantityAdjustmentRequest{Delta: delta}
@@ -208,9 +222,17 @@ func TestGetMovementsHandler(t *testing.T) {
 		}
 
 		var movements handler.MovementsSearchResult
-		json.NewDecoder(w.Body).Decode(&movements)
-		if count := movements.Meta.TotalCount; count != 0 {
-			t.Errorf("expected 0 movements, got %d", count)
+		var data, err = io.ReadAll(w.Body)
+		if err != nil {
+			t.Fatalf("error reading request body: %v", err)
+		}
+
+		if !strings.Contains(string(data), "not found") {
+			t.Errorf("expected not found to be returned, instead returned %v", string(data))
+		}
+
+		if err := json.NewDecoder(w.Body).Decode(&movements); err == nil {
+			t.Errorf("it is not expected to return any movement: %v", movements)
 		}
 	})
 }
@@ -225,8 +247,10 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		t.Fatalf("failed to create product")
 	}
 	var created handler.ProductResponse
-	json.NewDecoder(w.Body).Decode(&created)
 
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	// First adjustment: backdated (manually insert)
 	addMovement(models.Movement{
 		ProductID: created.Id,
@@ -315,8 +339,10 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 		t.Fatalf("failed to create product")
 	}
 	var created handler.ProductResponse
-	json.NewDecoder(w.Body).Decode(&created)
 
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	// Generate 3 movements
 	deltas := []int{+1, -1, +2}
 	for _, d := range deltas {
@@ -337,8 +363,10 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 		}
 
 		var resp handler.MovementsSearchResult
-		json.NewDecoder(w.Body).Decode(&resp)
 
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if resp.Meta.TotalCount == 0 {
 			t.Error("expected total_count in response")
 		}
@@ -358,7 +386,10 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 		}
 
 		var resp handler.MovementsSearchResult
-		json.NewDecoder(w.Body).Decode(&resp)
+
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if count := len(resp.Data); count != 2 {
 			t.Errorf("expected 2 items, got %d", count)
 		}
@@ -374,7 +405,10 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 		}
 
 		var resp handler.MovementsSearchResult
-		json.NewDecoder(w.Body).Decode(&resp)
+
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		items := resp.Data
 		if len(items) != 1 {
 			t.Errorf("expected 1 item, got %d", len(items))
@@ -397,8 +431,10 @@ func TestLowStockAlert(t *testing.T) {
 		t.Fatalf("failed to create product: %d", w.Code)
 	}
 	var created handler.ProductResponse
-	json.NewDecoder(w.Body).Decode(&created)
 
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	// Adjust to just above threshold (5 → 4) → no alert
 	t.Run("No alert above threshold", func(t *testing.T) {
 		adj := handler.QuantityAdjustmentRequest{Delta: -1}
@@ -410,8 +446,10 @@ func TestLowStockAlert(t *testing.T) {
 
 		// Use a generic map to decode response dynamically, allowing validation even when "low_stock" may be absent
 		var resp map[string]any
-		json.NewDecoder(w.Body).Decode(&resp)
 
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if resp["low_stock"] != nil {
 			t.Error("expected no low_stock alert above threshold")
 		}
@@ -427,8 +465,10 @@ func TestLowStockAlert(t *testing.T) {
 		}
 
 		var resp handler.ProductResponse
-		json.NewDecoder(w.Body).Decode(&resp)
 
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 		if resp.LowStock != true {
 			t.Error("expected low_stock alert to be true")
 		}
@@ -445,8 +485,10 @@ func TestExportMovementsHandler(t *testing.T) {
 		t.Fatalf("failed to create product")
 	}
 	var created handler.ProductResponse
-	json.NewDecoder(w.Body).Decode(&created)
 
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	adj := handler.QuantityAdjustmentRequest{Delta: 3}
 	w2 := adjustProduct(r, created.Id, adj)
 	if w2.Code != http.StatusOK {
@@ -510,8 +552,10 @@ func TestExportMovementsHandler_Filtered(t *testing.T) {
 		t.Fatalf("failed to create product")
 	}
 	var created handler.ProductResponse
-	json.NewDecoder(w.Body).Decode(&created)
 
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	// Insert one old movement
 	addMovement(models.Movement{
 		ProductID: created.Id,

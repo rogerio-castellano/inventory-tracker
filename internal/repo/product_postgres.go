@@ -25,7 +25,6 @@ func (r *PostgresProductRepository) Create(p models.Product) (models.Product, er
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, p.Name, p.Price, p.Quantity, p.Threshold, p.CreatedAt, p.UpdatedAt).Scan(&p.ID)
-
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
 			err = fmt.Errorf("%w: %v", ErrDuplicatedValueUnique, err)
@@ -129,7 +128,6 @@ func (r *PostgresProductRepository) Filter(pf ProductFilter) ([]models.Product, 
 	if pf.Offset != nil && *pf.Offset > 0 {
 		query += fmt.Sprintf(" OFFSET $%d", argIdx)
 		args = append(args, pf.Offset)
-		argIdx++
 	}
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
