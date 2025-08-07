@@ -99,7 +99,7 @@ func userRoleToken(r http.Handler) (string, error) {
 }
 
 func generateToken(r http.Handler, username, password string) (string, error) {
-	payload := models.Credentials{Username: username, Password: password}
+	payload := handler.CredentialsRequest{Username: username, Password: password}
 	body, _ := json.Marshal(payload)
 
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))

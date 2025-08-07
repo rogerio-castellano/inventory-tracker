@@ -55,3 +55,14 @@ type ImportProductsResult struct {
 	ImportedProductsCount int                      `json:"imported"`
 	Errors                []ProductValidationError `json:"errors"`
 }
+
+type CredentialsRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type RegisterAsAdminRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Role     string `json:"role"` // e.g., "user" or "admin"
+}

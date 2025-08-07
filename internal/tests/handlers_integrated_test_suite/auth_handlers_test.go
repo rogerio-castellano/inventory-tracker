@@ -9,15 +9,14 @@ import (
 	"testing"
 
 	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
-	handler "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
-	"github.com/rogerio-castellano/inventory-tracker/internal/models"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 )
 
 func TestAuthFlow(t *testing.T) {
 	r := api.NewRouter()
 
 	t.Run("Login with valid credentials", func(t *testing.T) {
-		payload := models.Credentials{Username: "admin", Password: "secret"}
+		payload := handlers.CredentialsRequest{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
 		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 		w := httptest.NewRecorder()
@@ -27,7 +26,7 @@ func TestAuthFlow(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.LoginResult
+		var resp handlers.LoginResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode token response: %v", err)
 		}
@@ -39,7 +38,7 @@ func TestAuthFlow(t *testing.T) {
 	t.Run("Protected route without token is rejected", func(t *testing.T) {
 		t.Cleanup(clearAllProducts)
 
-		product := handler.ProductRequest{Name: "AuthBox", Price: 999.0, Quantity: 1}
+		product := handlers.ProductRequest{Name: "AuthBox", Price: 999.0, Quantity: 1}
 		b, _ := json.Marshal(product)
 		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
 		w := httptest.NewRecorder()
@@ -52,17 +51,17 @@ func TestAuthFlow(t *testing.T) {
 
 	t.Run("Protected route with valid token succeeds", func(t *testing.T) {
 		t.Cleanup(clearAllProducts)
-		payload := models.Credentials{Username: "admin", Password: "secret"}
+		payload := handlers.CredentialsRequest{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
 		loginReq := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 		loginW := httptest.NewRecorder()
 		r.ServeHTTP(loginW, loginReq)
 
-		var resp handler.LoginResult
+		var resp handlers.LoginResult
 		_ = json.NewDecoder(loginW.Body).Decode(&resp)
 		token := resp.Token
 
-		product := handler.ProductRequest{Name: "SecureProduct", Price: 10.0, Quantity: 2}
+		product := handlers.ProductRequest{Name: "SecureProduct", Price: 10.0, Quantity: 2}
 		b, _ := json.Marshal(product)
 		req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(b))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -81,7 +80,7 @@ func TestRegisterHandler(t *testing.T) {
 
 	t.Run("Valid registration returns token", func(t *testing.T) {
 		t.Cleanup(clearAllUsersExceptAdmin)
-		data := models.Credentials{Username: "testuser", Password: "strongpassword"}
+		data := handlers.CredentialsRequest{Username: "testuser", Password: "strongpassword"}
 		body, _ := json.Marshal(data)
 		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -91,7 +90,7 @@ func TestRegisterHandler(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Fatalf("expected 201 Created, got %d", w.Code)
 		}
-		var resp handler.RegisterResult
+		var resp handlers.RegisterResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -102,7 +101,7 @@ func TestRegisterHandler(t *testing.T) {
 
 	t.Run("Duplicate username returns 409", func(t *testing.T) {
 		t.Cleanup(clearAllUsersExceptAdmin)
-		data := models.Credentials{Username: "testuser", Password: "anotherpass"}
+		data := handlers.CredentialsRequest{Username: "testuser", Password: "anotherpass"}
 		body, _ := json.Marshal(data)
 
 		var w *httptest.ResponseRecorder
@@ -124,7 +123,7 @@ func TestRegisterHandler(t *testing.T) {
 	})
 
 	t.Run("Too short password returns 400", func(t *testing.T) {
-		data := models.Credentials{Username: "shortpass",
+		data := handlers.CredentialsRequest{Username: "shortpass",
 			Password: "123"}
 		body, _ := json.Marshal(data)
 		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))

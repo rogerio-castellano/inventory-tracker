@@ -37,6 +37,11 @@ func NewRouter() http.Handler {
 		r.Post("/products/import", handlers.ImportProductsHandler)
 	})
 
+	r.Route("/admin", func(r chi.Router) {
+		r.Use(AuthMiddleware, RequireRole("admin"))
+		r.Post("/users", handlers.RegisterAsAdminHandler)
+	})
+
 	r.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("http://localhost:8080/swagger/doc.json"), //The url pointing to API definition
 	))

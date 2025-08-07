@@ -3,9 +3,10 @@ package http
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 )
 
 type contextKey string
@@ -20,7 +21,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		token, claims, err := tokenClaims(auth)
+		token, claims, err := handlers.TokenClaims(auth)
 		if err != nil || !token.Valid {
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
@@ -33,20 +34,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func tokenClaims(auth string) (*jwt.Token, jwt.MapClaims, error) {
-	tokenStr := strings.TrimPrefix(auth, "Bearer ")
-	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-		return []byte("super-secret-key"), nil
-	})
-
-	if err != nil || !token.Valid {
-		return nil, nil, err
-	}
-	claims := token.Claims.(jwt.MapClaims)
-
-	return token, claims, nil
-}
-
 func GetUserID(r *http.Request) int {
 	if val, ok := r.Context().Value(userIDKey).(int); ok {
 		return val
@@ -57,7 +44,7 @@ func GetUserID(r *http.Request) int {
 func RequireRole(role string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userRole, err := getRoleFromContext(r)
+			userRole, err := handlers.GetRoleFromContext(r)
 			if err != nil {
 				http.Error(w, "Forbidden: insufficient permissions", http.StatusForbidden)
 				return
@@ -71,32 +58,16 @@ func RequireRole(role string) func(http.Handler) http.Handler {
 	}
 }
 
-func getRoleFromContext(r *http.Request) (string, error) {
-	auth := r.Header.Get("Authorization")
-	_, claims, err := tokenClaims(auth)
-	if err != nil {
-		return "", err
-	}
-
-	if role, ok := claims["role"].(string); ok {
-		return role, nil
-	}
-	return "", nil
-}
-
 func RequireRoles(allowedRoles ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			role, err := getRoleFromContext(r)
+			role, err := handlers.GetRoleFromContext(r)
 			if err != nil {
-				//TODO
+				http.Error(w, "internal error", http.StatusInternalServerError)
 			}
-			//TODO
-			for _, allowed := range allowedRoles {
-				if role == allowed {
-					next.ServeHTTP(w, r)
-					return
-				}
+			if slices.Contains(allowedRoles, role) {
+				next.ServeHTTP(w, r)
+				return
 			}
 			http.Error(w, "Forbidden: insufficient permissions", http.StatusForbidden)
 		})
