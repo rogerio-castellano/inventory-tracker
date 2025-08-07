@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	models "github.com/rogerio-castellano/inventory-tracker/internal/models"
@@ -24,6 +25,13 @@ func (r *PostgresProductRepository) Create(p models.Product) (models.Product, er
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, p.Name, p.Price, p.Quantity, p.Threshold, p.CreatedAt, p.UpdatedAt).Scan(&p.ID)
+
+	if err != nil {
+		if strings.Contains(err.Error(), "23505") {
+			err = fmt.Errorf("%w: %v", ErrDuplicatedValueUnique, err)
+		}
+	}
+
 	return p, err
 }
 
