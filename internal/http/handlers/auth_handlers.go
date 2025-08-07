@@ -81,6 +81,18 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// @Summary Create user with custom role
+// @Tags admin
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param user body RegisterAsAdminRequest true "User to create with role"
+// @Success 201 {object} map[string]string
+// @Failure 400 {string} string "Invalid input"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 409 {string} string "User exists"
+// @Failure 500 {string} string "Server error"
+// @Router /admin/users [post]
 func RegisterAsAdminHandler(w http.ResponseWriter, r *http.Request) {
 	role, err := GetRoleFromContext(r)
 	if err != nil {

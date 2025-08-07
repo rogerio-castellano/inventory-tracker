@@ -68,6 +68,16 @@ definitions:
         description: can be positive or negative
         type: integer
     type: object
+  handlers.RegisterAsAdminRequest:
+    properties:
+      password:
+        type: string
+      role:
+        description: e.g., "user" or "admin"
+        type: string
+      username:
+        type: string
+    type: object
   repo.Metrics:
     properties:
       average_price:
@@ -110,6 +120,47 @@ info:
   title: Inventory Tracker API
   version: "1.0"
 paths:
+  /admin/users:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User to create with role
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterAsAdminRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "409":
+          description: User exists
+          schema:
+            type: string
+        "500":
+          description: Server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create user with custom role
+      tags:
+      - admin
   /login:
     post:
       consumes:
