@@ -15,6 +15,7 @@ type RefreshTokenEntry struct {
 }
 
 const refreshTokenFile = "refresh_tokens.json"
+const refreshTokenMaxAge = 7 * 24 * time.Hour // 7 days
 
 var refreshTokenStore = map[string]RefreshTokenEntry{}
 var mu sync.Mutex
@@ -83,4 +84,35 @@ func saveRefreshTokens() error {
 		return err
 	}
 	return os.WriteFile(refreshTokenFile, data, 0600)
+}
+
+func StartRefreshTokenCleaner(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+		cleanExpiredRefreshTokens()
+	}
+}
+
+func cleanExpiredRefreshTokens() {
+	changed := false
+	now := time.Now()
+
+	for username, entry := range refreshTokenStore {
+		if now.Sub(entry.CreatedAt) > refreshTokenMaxAge {
+			delete(refreshTokenStore, username)
+			changed = true
+		}
+	}
+
+	if changed {
+		err := saveRefreshTokens()
+		if err != nil {
+			log.Printf("⚠️ Failed to save cleaned refresh tokens: %v", err)
+		} else {
+			log.Println("🧹 Expired refresh tokens cleaned.")
+		}
+	}
 }

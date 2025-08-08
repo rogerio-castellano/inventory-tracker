@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
@@ -235,13 +234,6 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	stored, ok := auth.GetRefreshToken(req.Username)
 	if !ok || stored.Token != req.RefreshToken {
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
-		return
-	}
-
-	// Check max age
-	if time.Since(stored.CreatedAt) > 7*24*time.Hour {
-		auth.RemoveRefreshToken(req.Username)
-		http.Error(w, "Refresh token expired", http.StatusUnauthorized)
 		return
 	}
 

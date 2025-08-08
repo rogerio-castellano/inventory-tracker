@@ -3,7 +3,9 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
+	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/db"
 	httpRoutes "github.com/rogerio-castellano/inventory-tracker/internal/http"
 	routes "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
@@ -19,6 +21,8 @@ import (
 // @in header
 // @name Authorization
 func main() {
+	go auth.StartRefreshTokenCleaner(30 * time.Minute)
+
 	database, err := db.Connect()
 	if err != nil {
 		log.Fatal("❌ Could not connect to database:", err)
