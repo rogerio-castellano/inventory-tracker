@@ -12,6 +12,8 @@ import (
 type RefreshTokenEntry struct {
 	Token     string    `json:"token"`
 	CreatedAt time.Time `json:"created_at"`
+	IPAddress string    `json:"ip_address"`
+	UserAgent string    `json:"user_agent"`
 }
 
 const refreshTokenFile = "refresh_tokens.json"
@@ -52,9 +54,10 @@ func fileExists(path string) (bool, error) {
 	return false, err
 }
 
-func SetRefreshToken(key string, value string) {
+func SetRefreshToken(key string, token RefreshTokenEntry) {
 	mu.Lock()
-	refreshTokenStore[key] = RefreshTokenEntry{Token: value, CreatedAt: time.Now()}
+	token.CreatedAt = time.Now()
+	refreshTokenStore[key] = token
 	saveRefreshTokens()
 	mu.Unlock()
 }

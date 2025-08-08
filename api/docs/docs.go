@@ -1040,7 +1040,13 @@ const docTemplate = `{
                 "expires_at": {
                     "type": "string"
                 },
+                "ip_address": {
+                    "type": "string"
+                },
                 "issued_at": {
+                    "type": "string"
+                },
+                "user_agent": {
                     "type": "string"
                 },
                 "username": {

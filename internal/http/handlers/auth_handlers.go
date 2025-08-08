@@ -181,10 +181,15 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	refreshToken := generateRandomToken()
-	auth.SetRefreshToken(user.Username, refreshToken)
+	ip := r.RemoteAddr
+	ua := r.UserAgent()
+	auth.SetRefreshToken(user.Username, auth.RefreshTokenEntry{
+		Token:     refreshToken,
+		IPAddress: ip,
+		UserAgent: ua,
+	})
 
 	err = writeJSON(w, http.StatusOK, LoginResult{AccessToken: accessToken, RefreshToken: refreshToken})
-
 	if err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
@@ -251,7 +256,13 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Rotate refresh token
 	newRefreshToken := generateRandomToken()
-	auth.SetRefreshToken(req.Username, newRefreshToken)
+	ip := r.RemoteAddr
+	ua := r.UserAgent()
+	auth.SetRefreshToken(user.Username, auth.RefreshTokenEntry{
+		Token:     newRefreshToken,
+		IPAddress: ip,
+		UserAgent: ua,
+	})
 
 	if err := writeJSON(w, http.StatusOK, LoginResult{AccessToken: newToken, RefreshToken: newRefreshToken}); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
@@ -283,6 +294,8 @@ func ListRefreshTokensHandler(w http.ResponseWriter, r *http.Request) {
 			Username:  username,
 			IssuedAt:  entry.CreatedAt,
 			ExpiresAt: entry.CreatedAt.Add(auth.RefreshTokenMaxAge),
+			IPAddress: entry.IPAddress,
+			UserAgent: entry.UserAgent,
 		})
 	}
 
