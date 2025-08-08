@@ -75,6 +75,22 @@ definitions:
         description: can be positive or negative
         type: integer
     type: object
+  handlers.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+      username:
+        type: string
+    type: object
+  handlers.RefreshTokenInfo:
+    properties:
+      expires_at:
+        type: string
+      issued_at:
+        type: string
+      username:
+        type: string
+    type: object
   handlers.RegisterAsAdminRequest:
     properties:
       password:
@@ -127,6 +143,50 @@ info:
   title: Inventory Tracker API
   version: "1.0"
 paths:
+  /admin/tokens:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.RefreshTokenInfo'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List active refresh tokens
+      tags:
+      - admin
+  /admin/tokens/{username}:
+    delete:
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Token revoked
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Revoke a user’s refresh token
+      tags:
+      - admin
   /admin/users:
     post:
       consumes:
@@ -589,6 +649,37 @@ paths:
       summary: Filter and paginate products
       tags:
       - products
+  /refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Invalid token
+          schema:
+            type: string
+      summary: Refresh access token
+      tags:
+      - auth
   /register:
     post:
       consumes:

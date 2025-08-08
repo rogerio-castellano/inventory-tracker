@@ -23,6 +23,10 @@ fast-test: ## Run unit tests
 lint:
 	golangci-lint run
 
+.PHONY: docs
+docs:
+	swag init -g api/main.go --output api/docs
+
 # Docker targets
 bd: build
 build: ## Build the application
@@ -42,9 +46,6 @@ logs: ## Show application logs
 migrate-dev: ## Run migrations for development
 	docker compose exec api soda migrate -e development
 
-.PHONY: docs
-docs:
-	swag init -g api/main.go
 
 setup: ## Setup databases and run migrations
 	docker compose exec api bash ./scripts/setup-db.sh

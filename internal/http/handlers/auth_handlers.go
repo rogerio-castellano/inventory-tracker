@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
@@ -223,7 +224,6 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {string} string "Bad request"
 // @Failure 401 {string} string "Invalid token"
 // @Router /refresh [post]
-
 func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -266,4 +266,50 @@ func generateRandomToken() string {
 		return ""
 	}
 	return hex.EncodeToString(b)
+}
+
+// @Summary List active refresh tokens
+// @Tags admin
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {array} RefreshTokenInfo
+// @Failure 403 {string} string "Forbidden"
+// @Router /admin/tokens [get]
+func ListRefreshTokensHandler(w http.ResponseWriter, r *http.Request) {
+	tokens := []RefreshTokenInfo{}
+
+	for username, entry := range auth.GetrefreshTokens() {
+		tokens = append(tokens, RefreshTokenInfo{
+			Username:  username,
+			IssuedAt:  entry.CreatedAt,
+			ExpiresAt: entry.CreatedAt.Add(auth.RefreshTokenMaxAge),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tokens)
+}
+
+// @Summary Revoke a user’s refresh token
+// @Tags admin
+// @Security BearerAuth
+// @Param username path string true "Username"
+// @Success 204 "Token revoked"
+// @Failure 404 {string} string "Not found"
+// @Failure 403 {string} string "Forbidden"
+// @Router /admin/tokens/{username} [delete]
+func RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+	username := chi.URLParam(r, "username")
+
+	if _, ok := auth.GetRefreshToken(username); !ok {
+		http.Error(w, "Token not found", http.StatusNotFound)
+		return
+	}
+
+	if err := auth.RemoveRefreshToken(username); err != nil {
+		http.Error(w, "Failed to handle refresh token", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

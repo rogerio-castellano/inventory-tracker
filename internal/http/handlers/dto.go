@@ -1,5 +1,7 @@
 package handlers
 
+import "time"
+
 type ProductRequest struct {
 	Id        int     `json:"id,omitempty"`
 	Name      string  `json:"name"`
@@ -76,4 +78,10 @@ type MeResponse struct {
 type RefreshRequest struct {
 	Username     string `json:"username"`
 	RefreshToken string `json:"refresh_token"`
+}
+
+type RefreshTokenInfo struct {
+	Username  string    `json:"username"`
+	IssuedAt  time.Time `json:"issued_at"`
+	ExpiresAt time.Time `json:"expires_at"`
 }

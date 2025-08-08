@@ -40,6 +40,9 @@ func NewRouter() http.Handler {
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(AuthMiddleware, RequireRole("admin"))
 		r.Post("/users", handlers.RegisterAsAdminHandler)
+
+		r.Get("/tokens", handlers.ListRefreshTokensHandler)
+		r.Delete("/tokens/{username}", handlers.RevokeRefreshTokenHandler)
 	})
 
 	r.Get("/swagger/*", httpSwagger.Handler(

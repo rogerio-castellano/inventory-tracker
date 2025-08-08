@@ -15,17 +15,17 @@ type RefreshTokenEntry struct {
 }
 
 const refreshTokenFile = "refresh_tokens.json"
-const refreshTokenMaxAge = 7 * 24 * time.Hour // 7 days
+const RefreshTokenMaxAge = 7 * 24 * time.Hour // 7 days
 
 var refreshTokenStore = map[string]RefreshTokenEntry{}
 var mu sync.Mutex
 
 func GetRefreshToken(key string) (RefreshTokenEntry, bool) {
-	token, ok := refreshTokens()[key]
+	token, ok := GetrefreshTokens()[key]
 	return token, ok
 }
 
-func refreshTokens() map[string]RefreshTokenEntry {
+func GetrefreshTokens() map[string]RefreshTokenEntry {
 	if len(refreshTokenStore) == 0 {
 		exists, err := fileExists(refreshTokenFile)
 		if err != nil {
@@ -59,11 +59,12 @@ func SetRefreshToken(key string, value string) {
 	mu.Unlock()
 }
 
-func RemoveRefreshToken(key string) {
+func RemoveRefreshToken(key string) error {
 	mu.Lock()
 	delete(refreshTokenStore, key)
-	saveRefreshTokens()
+	err := saveRefreshTokens()
 	mu.Unlock()
+	return err
 }
 
 func loadRefreshTokens() error {
@@ -101,7 +102,7 @@ func cleanExpiredRefreshTokens() {
 	now := time.Now()
 
 	for username, entry := range refreshTokenStore {
-		if now.Sub(entry.CreatedAt) > refreshTokenMaxAge {
+		if now.Sub(entry.CreatedAt) > RefreshTokenMaxAge {
 			delete(refreshTokenStore, username)
 			changed = true
 		}
