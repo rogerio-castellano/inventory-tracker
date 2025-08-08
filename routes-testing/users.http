@@ -62,6 +62,10 @@ User-Agent: rest-client
 DELETE {{url}}/admin/tokens/adrian HTTP/1.1
 Authorization: Bearer {{token}}
 
+###
+POST {{url}}/logout HTTP/1.1
+Authorization: Bearer {{token}}
+
 
 ###
 # Login with valid credentials (keep it after business endpoints)

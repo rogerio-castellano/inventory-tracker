@@ -68,7 +68,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate a token for the new user
 	token, err := auth.GenerateToken(user)
 	if err != nil {
 		http.Error(w, "failed to generate token", http.StatusInternalServerError)
@@ -212,8 +211,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {string} string "Unauthorized"
 // @Router /me [get]
 func MeHandler(w http.ResponseWriter, r *http.Request) {
-	auth := r.Header.Get("Authorization")
-	_, claims, err := TokenClaims(auth)
+	authorization := r.Header.Get("Authorization")
+	_, claims, err := TokenClaims(authorization)
 	if err != nil {
 		log.Printf("Error getting claims: %v", err)
 	}
@@ -243,11 +242,6 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	userSessions, ok := auth.GetRefreshToken(req.Username)
-	if !ok {
-		http.Error(w, "Invalid username", http.StatusUnauthorized)
-		return
-	}
 
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -257,6 +251,11 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	ua := r.UserAgent()
 	key := sessionKey(host, ua)
+	userSessions, ok := auth.GetRefreshToken(req.Username)
+	if !ok {
+		http.Error(w, "Invalid username", http.StatusUnauthorized)
+		return
+	}
 	stored, ok := userSessions[key]
 	if !ok || stored.Token != req.RefreshToken {
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
@@ -283,7 +282,6 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Rotate refresh token
 	newRefreshToken := generateRandomToken()
-
 	auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
 		Token:     newRefreshToken,
 		IPAddress: host,
@@ -351,6 +349,35 @@ func RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to handle refresh token", http.StatusInternalServerError)
 		return
 	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// @Summary Logout (invalidate refresh token for this session)
+// @Tags auth
+// @Security BearerAuth
+// @Success 204 "Logged out"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Session not found"
+// @Failure 500 {string} string "Internal error"
+// @Router /logout [post]
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	authorization := r.Header.Get("Authorization")
+	_, claims, err := TokenClaims(authorization)
+	if err != nil {
+		log.Printf("Error getting claims: %v", err)
+	}
+	username := claims["username"].(string)
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		http.Error(w, "Invalid remote address", http.StatusInternalServerError)
+		return
+	}
+
+	ua := r.UserAgent()
+	key := sessionKey(host, ua)
+	auth.RemoveRefreshToken(username, key)
 
 	w.WriteHeader(http.StatusNoContent)
 }

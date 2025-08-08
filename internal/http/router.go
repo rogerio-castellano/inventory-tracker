@@ -35,6 +35,8 @@ func NewRouter() http.Handler {
 		r.Delete("/products/{id}", handlers.DeleteProductHandler)
 		r.Post("/products/{id}/adjust", handlers.AdjustQuantityHandler)
 		r.Post("/products/import", handlers.ImportProductsHandler)
+
+		r.Post("/logout", handlers.LogoutHandler)
 	})
 
 	r.Route("/admin", func(r chi.Router) {

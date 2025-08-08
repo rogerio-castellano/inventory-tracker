@@ -34,13 +34,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func GetUserID(r *http.Request) int {
-	if val, ok := r.Context().Value(userIDKey).(int); ok {
-		return val
-	}
-	return 0
-}
-
 func RequireRole(role string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
