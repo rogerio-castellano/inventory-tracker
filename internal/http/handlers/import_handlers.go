@@ -2,11 +2,9 @@ package handlers
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -86,13 +84,6 @@ func nowRFC3339() string {
 	return time.Now().Format(time.RFC3339)
 }
 
-func writeJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("Failed to write JSON response: %v", err)
-	}
-}
-
 // ImportProductsHandler godoc
 // @Summary Import products via CSV
 // @Tags import
@@ -168,8 +159,12 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 		imported++
 	}
 
-	writeJSON(w, ImportProductsResult{
+	err = writeJSON(w, http.StatusOK, ImportProductsResult{
 		ImportedProductsCount: imported,
 		Errors:                errorsList,
 	})
+
+	if err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+	}
 }

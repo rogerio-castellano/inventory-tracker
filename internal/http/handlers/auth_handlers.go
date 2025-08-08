@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -31,7 +30,7 @@ import (
 // @Router /register [post]
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var creds CredentialsRequest
-	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+	if err := readJSON(w, r, &creds); err != nil {
 		http.Error(w, "invalid input", http.StatusBadRequest)
 		return
 	}
@@ -75,12 +74,10 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	err = json.NewEncoder(w).Encode(RegisterResult{
+	err = writeJSON(w, http.StatusCreated, RegisterResult{
 		Message: "user registered",
 		Token:   token,
 	})
-
 	if err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
@@ -111,7 +108,7 @@ func RegisterAsAdminHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req RegisterAsAdminRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := readJSON(w, r, &req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
@@ -142,8 +139,7 @@ func RegisterAsAdminHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	err = json.NewEncoder(w).Encode(map[string]string{
+	err = writeJSON(w, http.StatusCreated, map[string]string{
 		"message": "User created",
 	})
 
@@ -164,7 +160,7 @@ func RegisterAsAdminHandler(w http.ResponseWriter, r *http.Request) {
 // @Router /login [post]
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var credentials CredentialsRequest
-	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
+	if err := readJSON(w, r, &credentials); err != nil {
 		http.Error(w, "invalid input", http.StatusBadRequest)
 		return
 	}
@@ -186,7 +182,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = json.NewEncoder(w).Encode(LoginResult{Token: token})
+	err = writeJSON(w, http.StatusOK, LoginResult{Token: token})
 
 	if err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
@@ -213,9 +209,7 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 		Role:     claims["role"].(string),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := writeJSON(w, http.StatusOK, resp); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }

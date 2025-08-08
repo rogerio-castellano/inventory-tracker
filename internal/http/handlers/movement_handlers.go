@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -35,7 +34,7 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req QuantityAdjustmentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := readJSON(w, r, &req); err != nil {
 		http.Error(w, "invalid input", http.StatusBadRequest)
 		return
 	}
@@ -67,7 +66,7 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 	if product.Quantity < product.Threshold {
 		resp.LowStock = true
 	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := writeJSON(w, http.StatusOK, resp); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }
@@ -181,7 +180,7 @@ func GetMovementsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := writeJSON(w, http.StatusOK, resp); err != nil {
 		log.Printf("failed to encode response: %v", err)
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
@@ -235,7 +234,7 @@ func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", `attachment; filename="movements.json"`)
 
-		if err := json.NewEncoder(w).Encode(movements); err != nil {
+		if err := writeJSON(w, http.StatusOK, movements); err != nil {
 			log.Printf("Failed to write JSON response: %v", err)
 		}
 	case "csv":

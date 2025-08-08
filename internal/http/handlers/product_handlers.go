@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -26,7 +25,7 @@ import (
 // @Router /products [post]
 func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	var req ProductRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := readJSON(w, r, &req); err != nil {
 		http.Error(w, "invalid input", http.StatusBadRequest)
 		return
 	}
@@ -34,7 +33,7 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 	validationErrors := validateProduct(req)
 	if len(validationErrors) > 0 {
 		w.WriteHeader(http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(validationErrors); err != nil {
+		if err := writeJSON(w, http.StatusOK, validationErrors); err != nil {
 			log.Printf("Failed to write JSON response: %v", err)
 		}
 		return
@@ -69,7 +68,7 @@ func CreateProductHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := writeJSON(w, http.StatusOK, resp); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }
@@ -99,7 +98,7 @@ func GetProductsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := writeJSON(w, http.StatusOK, response); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }
@@ -140,7 +139,7 @@ func GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
 		LowStock:  product.Quantity < product.Threshold,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := writeJSON(w, http.StatusOK, resp); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }
@@ -199,7 +198,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req ProductRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := readJSON(w, r, &req); err != nil {
 		http.Error(w, "invalid input", http.StatusBadRequest)
 		return
 	}
@@ -207,7 +206,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	validationErrors := validateProduct(req)
 	if len(validationErrors) > 0 {
 		w.WriteHeader(http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(validationErrors); err != nil {
+		if err := writeJSON(w, http.StatusOK, validationErrors); err != nil {
 			log.Printf("Failed to write JSON response: %v", err)
 		}
 		return
@@ -240,7 +239,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		LowStock:  updated.Quantity < updated.Threshold,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := writeJSON(w, http.StatusOK, resp); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }
@@ -326,7 +325,7 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := writeJSON(w, http.StatusOK, resp); err != nil {
 		log.Printf("failed to encode response: %v", err)
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}

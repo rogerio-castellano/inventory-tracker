@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 )
@@ -20,7 +19,7 @@ func GetDashboardMetricsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(m); err != nil {
+	if err := writeJSON(w, http.StatusOK, m); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }
