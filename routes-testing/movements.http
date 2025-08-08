@@ -1,16 +1,7 @@
 @url=http://localhost:8080
-@product=34
+@product=1
 @since=2025-07-09T07:56:02Z
 @until=2025-07-09T07:56:08Z
-
-# Login with valid credentials
-POST {{url}}/login HTTP/1.1
-Content-Type: application/json
-
-{
-    "username": "admin",
-    "password": "secret"
-}
 
 ###
 GET {{url}}/products/{{product}}/movements HTTP/1.1

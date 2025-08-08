@@ -1,16 +1,9 @@
 @url=http://localhost:8080
-@token=
-
-# Login with valid credentials
-POST {{url}}/login HTTP/1.1
-Content-Type: application/json
-
-{
-    "username": "admin",
-    "password": "secret"
-}
+# Run the login request at the bottom of this file (@name login) to obtain the auth token
+@token={{login.response.body.$.token}}
 
 ### Valid product creation
+
 POST {{url}}/products HTTP/1.1
 Content-Type: application/json
 Authorization: Bearer {{token}}
@@ -65,3 +58,14 @@ Content-Type: text/csv
 --boundary--
 
 
+
+###
+# Login with valid credentials (keep it after business endpoints)
+# @name login
+POST {{url}}/login HTTP/1.1
+Content-Type: application/json
+
+{
+    "username": "admin",
+    "password": "secret"
+}

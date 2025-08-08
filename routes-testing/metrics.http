@@ -1,7 +1,10 @@
 @url=http://localhost:8080
-@token=
+
+# Replace below with loginUserRole and run this request to test with unauthorized role
+@token={{loginAdminRole.response.body.$.token}}
 
 # Login with admin role credentials (authorized)
+# @name loginAdminRole
 POST {{url}}/login HTTP/1.1
 Content-Type: application/json
 
@@ -11,6 +14,7 @@ Content-Type: application/json
 }
 
 ### Login with user role credentials (unauthorized)
+# @name loginUserRole
 POST {{url}}/login HTTP/1.1
 Content-Type: application/json
 
