@@ -43,7 +43,8 @@ type MovementsSearchResult struct {
 }
 
 type LoginResult struct {
-	Token string `json:"token"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type RegisterResult struct {
@@ -70,4 +71,9 @@ type RegisterAsAdminRequest struct {
 type MeResponse struct {
 	Username string `json:"username"`
 	Role     string `json:"role"`
+}
+
+type RefreshRequest struct {
+	Username     string `json:"username"`
+	RefreshToken string `json:"refresh_token"`
 }

@@ -37,12 +37,6 @@ func TokenClaims(auth string) (*jwt.Token, jwt.MapClaims, error) {
 	return token, claims, nil
 }
 
-type jsonResponse struct {
-	Error   bool   `json:"error"`
-	Message string `json:"message"`
-	Data    any    `json:"data,omitempty"`
-}
-
 // readJSON tries to read the body of a request and converts it into JSON
 func readJSON(w http.ResponseWriter, r *http.Request, data any) error {
 	maxBytes := 1048576 // one megabyte
@@ -83,20 +77,4 @@ func writeJSON(w http.ResponseWriter, status int, data any, headers ...http.Head
 	}
 
 	return nil
-}
-
-// errorJSON takes an error, and optionally a response status code, and generates and sends
-// a json error response
-func errorJSON(w http.ResponseWriter, err error, status ...int) error {
-	statusCode := http.StatusBadRequest
-
-	if len(status) > 0 {
-		statusCode = status[0]
-	}
-
-	var payload jsonResponse
-	payload.Error = true
-	payload.Message = err.Error()
-
-	return writeJSON(w, statusCode, payload)
 }

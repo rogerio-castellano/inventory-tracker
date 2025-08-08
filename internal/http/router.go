@@ -48,5 +48,7 @@ func NewRouter() http.Handler {
 
 	r.With(AuthMiddleware).Get("/me", handlers.MeHandler)
 
+	r.Post("/refresh", handlers.RefreshHandler)
+
 	return r
 }

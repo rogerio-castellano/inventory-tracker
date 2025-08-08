@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -12,11 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// var userRepo repo.UserRepository
-
-// func SetUserRepo(r repo.UserRepository) {
-// 	userRepo = r
-// }
+var refreshTokens = make(map[string]string)
 
 // RegisterHandler godoc
 // @Summary Register new user and return JWT token
@@ -176,13 +175,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.GenerateToken(user)
+	accessToken, err := auth.GenerateToken(user)
 	if err != nil {
 		http.Error(w, "could not generate token", http.StatusInternalServerError)
 		return
 	}
 
-	err = writeJSON(w, http.StatusOK, LoginResult{Token: token})
+	refreshToken := generateRandomToken()
+	refreshTokens[user.Username] = refreshToken
+
+	err = writeJSON(w, http.StatusOK, LoginResult{AccessToken: accessToken, RefreshToken: refreshToken})
 
 	if err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
@@ -212,4 +214,54 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 	if err := writeJSON(w, http.StatusOK, resp); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
+}
+
+// @Summary Refresh access token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body RefreshRequest true "Refresh token data"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "Bad request"
+// @Failure 401 {string} string "Invalid token"
+// @Router /refresh [post]
+
+func RefreshHandler(w http.ResponseWriter, r *http.Request) {
+	var req RefreshRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	stored, ok := refreshTokens[req.Username]
+	if !ok || stored != req.RefreshToken {
+		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := userRepo.GetByUsername(req.Username)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusUnauthorized)
+		return
+	}
+
+	newToken, err := auth.GenerateToken(user)
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	if err := writeJSON(w, http.StatusOK, map[string]string{"access_token": newToken}); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
+}
+
+func generateRandomToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// Handle error gracefully — fallback, panic, or log
+		log.Printf("Failed to generate random bytes: %v", err)
+		return ""
+	}
+	return hex.EncodeToString(b)
 }

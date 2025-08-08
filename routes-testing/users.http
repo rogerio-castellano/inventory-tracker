@@ -1,6 +1,7 @@
 @url=http://localhost:8080
 # Run the login request at the bottom of this file (@name login) to obtain the auth token
-@token={{login.response.body.$.token}}
+@token={{login.response.body.$.access_token}}
+@refreshToken={{login.response.body.$.refresh_token}}
 
 ###
 POST {{url}}/register HTTP/1.1
@@ -25,6 +26,26 @@ Content-Type: application/json
 ###
 GET {{url}}/me HTTP/1.1
 Authorization: Bearer {{token}}
+
+###
+# @name refresh
+POST {{url}}/refresh HTTP/1.1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "username" : "admin",
+    "refresh_token": "{{refreshToken}}"
+}
+
+### Test refresh token
+# 1) Run @name login
+# 2) Run @name refresh
+# 3) Run this request
+GET {{url}}/me HTTP/1.1
+Authorization: Bearer {{refresh.response.body.$.access_token}}
+
+
 
 
 ###

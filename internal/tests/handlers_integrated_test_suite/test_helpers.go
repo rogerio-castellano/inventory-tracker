@@ -122,7 +122,7 @@ func generateToken(r http.Handler, username, password string) (string, error) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		return "", fmt.Errorf("token decoding failed: %v", err)
 	}
-	return resp.Token, nil
+	return resp.AccessToken, nil
 }
 
 func userExists(username string) (bool, error) {

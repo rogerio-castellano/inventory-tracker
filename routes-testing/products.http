@@ -1,6 +1,6 @@
 @url=http://localhost:8080
 # Run the login request at the bottom of this file (@name login) to obtain the auth token
-@token={{login.response.body.$.token}}
+@token={{login.response.body.$.access_token}}
 
 ### Valid product creation
 

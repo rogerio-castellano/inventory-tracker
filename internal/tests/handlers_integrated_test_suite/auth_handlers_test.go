@@ -30,8 +30,11 @@ func TestAuthFlow(t *testing.T) {
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode token response: %v", err)
 		}
-		if resp.Token == "" {
-			t.Error("expected token in response")
+		if resp.AccessToken == "" {
+			t.Error("expected access token in response")
+		}
+		if resp.RefreshToken == "" {
+			t.Error("expected refresh token in response")
 		}
 	})
 
@@ -59,7 +62,7 @@ func TestAuthFlow(t *testing.T) {
 
 		var resp handlers.LoginResult
 		_ = json.NewDecoder(loginW.Body).Decode(&resp)
-		token := resp.Token
+		token := resp.AccessToken
 
 		product := handlers.ProductRequest{Name: "SecureProduct", Price: 10.0, Quantity: 2}
 		b, _ := json.Marshal(product)
