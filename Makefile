@@ -8,14 +8,27 @@ PWD = $(shell pwd)
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk "BEGIN {FS = \":.*?## \"}; {printf \"%-20s %s\\n\", \$$1, \$$2}"
 
-# Docker commands
+# Go targets
+bg:build-go
+build-go:	
+	go build ./api/main.go
+
+test: ## Run all tests
+	go test ./...
+
+t:fast-test
+fast-test: ## Run unit tests
+	go test ./internal/tests/handlers_integrated_test_suite
+
+lint:
+	golangci-lint run
+
+# Docker targets
+b: build
 build: ## Build the application
 	docker compose build
 	$(MAKE) down
 	$(MAKE) up
-
-build-go:	
-	go build ./api/main.go
 
 up: ## Start all services
 	docker compose up -d
@@ -28,12 +41,6 @@ logs: ## Show application logs
 
 migrate-dev: ## Run migrations for development
 	docker compose exec api soda migrate -e development
-
-test: ## Run tests
-	go test ./...
-
-lint:
-	golangci-lint run
 
 .PHONY: docs
 docs:
