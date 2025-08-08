@@ -6,14 +6,25 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 )
+
+type RefreshTokenEntry struct {
+	Token     string    `json:"token"`
+	CreatedAt time.Time `json:"created_at"`
+}
 
 const refreshTokenFile = "refresh_tokens.json"
 
-var refreshTokenStore = map[string]string{}
+var refreshTokenStore = map[string]RefreshTokenEntry{}
 var mu sync.Mutex
 
-func RefreshTokens() map[string]string {
+func GetRefreshToken(key string) (RefreshTokenEntry, bool) {
+	token, ok := refreshTokens()[key]
+	return token, ok
+}
+
+func refreshTokens() map[string]RefreshTokenEntry {
 	if len(refreshTokenStore) == 0 {
 		exists, err := fileExists(refreshTokenFile)
 		if err != nil {
@@ -42,7 +53,14 @@ func fileExists(path string) (bool, error) {
 
 func SetRefreshToken(key string, value string) {
 	mu.Lock()
-	refreshTokenStore[key] = value
+	refreshTokenStore[key] = RefreshTokenEntry{Token: value, CreatedAt: time.Now()}
+	saveRefreshTokens()
+	mu.Unlock()
+}
+
+func RemoveRefreshToken(key string) {
+	mu.Lock()
+	delete(refreshTokenStore, key)
 	saveRefreshTokens()
 	mu.Unlock()
 }
@@ -51,7 +69,7 @@ func loadRefreshTokens() error {
 	data, err := os.ReadFile(refreshTokenFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			refreshTokenStore = map[string]string{}
+			refreshTokenStore = make(map[string]RefreshTokenEntry)
 			return nil
 		}
 		return err

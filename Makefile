@@ -9,7 +9,7 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk "BEGIN {FS = \":.*?## \"}; {printf \"%-20s %s\\n\", \$$1, \$$2}"
 
 # Go targets
-bg:build-go
+b:build-go
 build-go:	
 	go build ./api/main.go
 
@@ -24,7 +24,7 @@ lint:
 	golangci-lint run
 
 # Docker targets
-b: build
+bd: build
 build: ## Build the application
 	docker compose build
 	$(MAKE) down
