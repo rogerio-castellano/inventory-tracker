@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
@@ -181,11 +184,17 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	refreshToken := generateRandomToken()
-	ip := r.RemoteAddr
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		http.Error(w, "Invalid remote address", http.StatusInternalServerError)
+		return
+	}
+
 	ua := r.UserAgent()
-	auth.SetRefreshToken(user.Username, auth.RefreshTokenEntry{
+	key := sessionKey(host, ua)
+	auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
 		Token:     refreshToken,
-		IPAddress: ip,
+		IPAddress: host,
 		UserAgent: ua,
 	})
 
@@ -203,7 +212,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {string} string "Unauthorized"
 // @Router /me [get]
 func MeHandler(w http.ResponseWriter, r *http.Request) {
-
 	auth := r.Header.Get("Authorization")
 	_, claims, err := TokenClaims(auth)
 	if err != nil {
@@ -235,10 +243,29 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
+	userSessions, ok := auth.GetRefreshToken(req.Username)
+	if !ok {
+		http.Error(w, "Invalid username", http.StatusUnauthorized)
+		return
+	}
 
-	stored, ok := auth.GetRefreshToken(req.Username)
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		http.Error(w, "Invalid remote address", http.StatusInternalServerError)
+		return
+	}
+
+	ua := r.UserAgent()
+	key := sessionKey(host, ua)
+	stored, ok := userSessions[key]
 	if !ok || stored.Token != req.RefreshToken {
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
+		return
+	}
+
+	if time.Since(stored.CreatedAt) > auth.RefreshTokenMaxAge {
+		auth.RemoveRefreshToken(req.Username, key)
+		http.Error(w, "Refresh token expired", http.StatusUnauthorized)
 		return
 	}
 
@@ -256,11 +283,10 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Rotate refresh token
 	newRefreshToken := generateRandomToken()
-	ip := r.RemoteAddr
-	ua := r.UserAgent()
-	auth.SetRefreshToken(user.Username, auth.RefreshTokenEntry{
+
+	auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
 		Token:     newRefreshToken,
-		IPAddress: ip,
+		IPAddress: host,
 		UserAgent: ua,
 	})
 
@@ -289,14 +315,16 @@ func generateRandomToken() string {
 func ListRefreshTokensHandler(w http.ResponseWriter, r *http.Request) {
 	tokens := []RefreshTokenInfo{}
 
-	for username, entry := range auth.GetrefreshTokens() {
-		tokens = append(tokens, RefreshTokenInfo{
-			Username:  username,
-			IssuedAt:  entry.CreatedAt,
-			ExpiresAt: entry.CreatedAt.Add(auth.RefreshTokenMaxAge),
-			IPAddress: entry.IPAddress,
-			UserAgent: entry.UserAgent,
-		})
+	for username, sessions := range auth.GetrefreshTokens() {
+		for _, entry := range sessions {
+			tokens = append(tokens, RefreshTokenInfo{
+				Username:  username,
+				IssuedAt:  entry.CreatedAt,
+				ExpiresAt: entry.CreatedAt.Add(auth.RefreshTokenMaxAge),
+				IPAddress: entry.IPAddress,
+				UserAgent: entry.UserAgent,
+			})
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -319,10 +347,16 @@ func RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := auth.RemoveRefreshToken(username); err != nil {
+	if err := auth.RemoveUserRefreshTokens(username); err != nil {
 		http.Error(w, "Failed to handle refresh token", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func sessionKey(ip, ua string) string {
+	h := sha256.New()
+	h.Write([]byte(ip + ua))
+	return hex.EncodeToString(h.Sum(nil))
 }

@@ -19,16 +19,16 @@ type RefreshTokenEntry struct {
 const refreshTokenFile = "refresh_tokens.json"
 const RefreshTokenMaxAge = 7 * 24 * time.Hour // 7 days
 
-var refreshTokenStore = map[string]RefreshTokenEntry{}
+var tokenStore = map[string]map[string]RefreshTokenEntry{}
 var mu sync.Mutex
 
-func GetRefreshToken(key string) (RefreshTokenEntry, bool) {
-	token, ok := GetrefreshTokens()[key]
+func GetRefreshToken(username string) (map[string]RefreshTokenEntry, bool) {
+	token, ok := GetrefreshTokens()[username]
 	return token, ok
 }
 
-func GetrefreshTokens() map[string]RefreshTokenEntry {
-	if len(refreshTokenStore) == 0 {
+func GetrefreshTokens() map[string]map[string]RefreshTokenEntry {
+	if len(tokenStore) == 0 {
 		exists, err := fileExists(refreshTokenFile)
 		if err != nil {
 			log.Println("Error loading Refresh token file")
@@ -39,7 +39,7 @@ func GetrefreshTokens() map[string]RefreshTokenEntry {
 		}
 	}
 
-	return refreshTokenStore
+	return tokenStore
 }
 
 func fileExists(path string) (bool, error) {
@@ -54,19 +54,35 @@ func fileExists(path string) (bool, error) {
 	return false, err
 }
 
-func SetRefreshToken(key string, token RefreshTokenEntry) {
+func SetRefreshToken(username, key string, token RefreshTokenEntry) {
 	mu.Lock()
+	defer mu.Unlock()
+
 	token.CreatedAt = time.Now()
-	refreshTokenStore[key] = token
+
+	if _, exists := tokenStore[username]; !exists {
+		tokenStore[username] = make(map[string]RefreshTokenEntry)
+	}
+	tokenStore[username][key] = token
+
 	saveRefreshTokens()
-	mu.Unlock()
 }
 
-func RemoveRefreshToken(key string) error {
+func RemoveRefreshToken(username string, key string) error {
 	mu.Lock()
-	delete(refreshTokenStore, key)
+	defer mu.Unlock()
+	if userTokens, ok := tokenStore[username]; ok {
+		delete(userTokens, key)
+	}
 	err := saveRefreshTokens()
-	mu.Unlock()
+	return err
+}
+
+func RemoveUserRefreshTokens(username string) error {
+	mu.Lock()
+	defer mu.Unlock()
+	delete(tokenStore, username)
+	err := saveRefreshTokens()
 	return err
 }
 
@@ -74,16 +90,16 @@ func loadRefreshTokens() error {
 	data, err := os.ReadFile(refreshTokenFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			refreshTokenStore = make(map[string]RefreshTokenEntry)
+			tokenStore = make(map[string]map[string]RefreshTokenEntry)
 			return nil
 		}
 		return err
 	}
-	return json.Unmarshal(data, &refreshTokenStore)
+	return json.Unmarshal(data, &tokenStore)
 }
 
 func saveRefreshTokens() error {
-	data, err := json.MarshalIndent(refreshTokenStore, "", "  ")
+	data, err := json.MarshalIndent(tokenStore, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -104,10 +120,15 @@ func cleanExpiredRefreshTokens() {
 	changed := false
 	now := time.Now()
 
-	for username, entry := range refreshTokenStore {
-		if now.Sub(entry.CreatedAt) > RefreshTokenMaxAge {
-			delete(refreshTokenStore, username)
-			changed = true
+	for username, sessions := range tokenStore {
+		for key, entry := range sessions {
+			if now.Sub(entry.CreatedAt) > RefreshTokenMaxAge {
+				delete(sessions, key)
+				changed = true
+			}
+		}
+		if len(sessions) == 0 {
+			delete(tokenStore, username)
 		}
 	}
 
