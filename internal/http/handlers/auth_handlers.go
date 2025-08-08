@@ -382,6 +382,23 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
+	authorization := r.Header.Get("Authorization")
+	_, claims, err := TokenClaims(authorization)
+	if err != nil {
+		log.Printf("Error getting claims: %v", err)
+	}
+	username := claims["username"].(string)
+
+	if _, ok := auth.GetrefreshTokens()[username]; !ok {
+		http.Error(w, "No active sessions", http.StatusNotFound)
+		return
+	}
+	auth.RemoveUserRefreshTokens(username)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func sessionKey(ip, ua string) string {
 	h := sha256.New()
 	h.Write([]byte(ip + ua))

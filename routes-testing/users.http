@@ -66,6 +66,9 @@ Authorization: Bearer {{token}}
 POST {{url}}/logout HTTP/1.1
 Authorization: Bearer {{token}}
 
+###
+POST {{url}}/logout/all HTTP/1.1
+Authorization: Bearer {{token}}
 
 ###
 # Login with valid credentials (keep it after business endpoints)
