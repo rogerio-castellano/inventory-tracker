@@ -7,15 +7,15 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
+	"github.com/rogerio-castellano/inventory-tracker/internal/config"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
 	"golang.org/x/crypto/bcrypt"
 )
-
-var refreshTokens = make(map[string]string)
 
 // RegisterHandler godoc
 // @Summary Register new user and return JWT token
@@ -182,7 +182,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	refreshToken := generateRandomToken()
-	refreshTokens[user.Username] = refreshToken
+
+	config.RefreshTokens[user.Username] = refreshToken
 
 	err = writeJSON(w, http.StatusOK, LoginResult{AccessToken: accessToken, RefreshToken: refreshToken})
 
@@ -233,7 +234,7 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stored, ok := refreshTokens[req.Username]
+	stored, ok := config.RefreshTokens[req.Username]
 	if !ok || stored != req.RefreshToken {
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
 		return
@@ -251,7 +252,12 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := writeJSON(w, http.StatusOK, map[string]string{"access_token": newToken}); err != nil {
+	// Rotate refresh token
+	newRefreshToken := generateRandomToken()
+	config.RefreshTokens[req.Username] = newRefreshToken
+	saveRefreshTokens()
+
+	if err := writeJSON(w, http.StatusOK, LoginResult{AccessToken: newToken, RefreshToken: newRefreshToken}); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }
@@ -264,4 +270,12 @@ func generateRandomToken() string {
 		return ""
 	}
 	return hex.EncodeToString(b)
+}
+
+func saveRefreshTokens() error {
+	data, err := json.MarshalIndent(config.RefreshTokens, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(config.RefreshTokenFile, data, 0600)
 }
