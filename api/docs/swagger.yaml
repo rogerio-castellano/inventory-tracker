@@ -1,5 +1,12 @@
 basePath: /
 definitions:
+  handlers.MeResponse:
+    properties:
+      role:
+        type: string
+      username:
+        type: string
+    type: object
   handlers.Meta:
     properties:
       total_count:
@@ -192,6 +199,24 @@ paths:
           schema:
             type: string
       summary: Authenticate user and return JWT token
+      tags:
+      - auth
+  /me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get current user info
       tags:
       - auth
   /metrics/dashboard:
