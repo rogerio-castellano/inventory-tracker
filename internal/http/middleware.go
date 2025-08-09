@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"slices"
@@ -126,6 +127,7 @@ func RedisRateLimitMiddleware(route string, maxRequests int, window time.Duratio
 
 			// If over limit
 			if count > int64(maxRequests) {
+				recordRateLimitStrike(key)
 				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(ttl.Seconds())))
 				http.Error(w, "Too many requests", http.StatusTooManyRequests)
 				return
@@ -135,6 +137,9 @@ func RedisRateLimitMiddleware(route string, maxRequests int, window time.Duratio
 		})
 	}
 }
+
+const rateLimitStrikeThreshold = 5
+const rateLimitStrikeWindow = 10 * time.Minute
 
 func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -174,6 +179,7 @@ func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", int(ttl.Seconds())))
 
 			if count > int64(cfg.MaxRequests) {
+				recordRateLimitStrike(key)
 				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(ttl.Seconds())))
 				http.Error(w, "Too many requests", http.StatusTooManyRequests)
 				return
@@ -181,6 +187,21 @@ func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(w, r)
 		})
+	}
+}
+
+func recordRateLimitStrike(key string) {
+	strikeKey := fmt.Sprintf("ratelimit:strikes:%s", key)
+	rdb := handlers.AuthSvc.Rdb()
+	ctx := handlers.AuthSvc.Ctx()
+
+	// Increment strike counter
+	strikes, err := rdb.Incr(ctx, strikeKey).Result()
+	if err == nil {
+		rdb.Expire(ctx, strikeKey, rateLimitStrikeWindow)
+		if strikes >= int64(rateLimitStrikeThreshold) {
+			log.Printf("⚠️ RATE LIMIT ABUSE: key=%s (%d strikes in %v)", key, strikes, rateLimitStrikeWindow)
+		}
 	}
 }
 
@@ -224,7 +245,6 @@ func getRateLimitConfigForRole(role string) RateLimitConfig {
 
 func getClientIdentifier(r *http.Request) (string, error) {
 	authorization := r.Header.Get("Authorization")
-	fmt.Println("authorization", authorization)
 
 	if strings.HasPrefix(authorization, "Bearer ") {
 		_, claims, err := auth.TokenClaims(authorization)
