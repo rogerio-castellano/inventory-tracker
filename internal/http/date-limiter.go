@@ -32,7 +32,7 @@ func getVisitor(ip string) *rate.Limiter {
 	return v.limiter
 }
 
-func CleanupVisitors() {
+func StartVisitorCleanupLoop() {
 	for {
 		time.Sleep(time.Minute)
 		mu.Lock()
@@ -43,4 +43,8 @@ func CleanupVisitors() {
 		}
 		mu.Unlock()
 	}
+}
+
+func CleanupAllVisitors() {
+	visitors = make(map[string]*clientLimiter)
 }

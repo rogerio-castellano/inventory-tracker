@@ -9,13 +9,21 @@ import (
 	"testing"
 
 	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
+	httpapp "github.com/rogerio-castellano/inventory-tracker/internal/http"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 )
+
+func runWithVisitorCleanup(t *testing.T, name string, testFunc func(t *testing.T)) {
+	t.Run(name, func(t *testing.T) {
+		httpapp.CleanupAllVisitors()
+		testFunc(t)
+	})
+}
 
 func TestAuthFlow(t *testing.T) {
 	r := api.NewRouter()
 
-	t.Run("Login with valid credentials", func(t *testing.T) {
+	runWithVisitorCleanup(t, "Login with valid credentials", func(t *testing.T) {
 		payload := handlers.CredentialsRequest{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
 		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
@@ -38,7 +46,7 @@ func TestAuthFlow(t *testing.T) {
 		}
 	})
 
-	t.Run("Protected route without token is rejected", func(t *testing.T) {
+	runWithVisitorCleanup(t, "Protected route without token is rejected", func(t *testing.T) {
 		t.Cleanup(clearAllProducts)
 
 		product := handlers.ProductRequest{Name: "AuthBox", Price: 999.0, Quantity: 1}
@@ -52,7 +60,7 @@ func TestAuthFlow(t *testing.T) {
 		}
 	})
 
-	t.Run("Protected route with valid token succeeds", func(t *testing.T) {
+	runWithVisitorCleanup(t, "Protected route with valid token succeeds", func(t *testing.T) {
 		t.Cleanup(clearAllProducts)
 		payload := handlers.CredentialsRequest{Username: "admin", Password: "secret"}
 		body, _ := json.Marshal(payload)
@@ -81,7 +89,7 @@ func TestAuthFlow(t *testing.T) {
 func TestRegisterHandler(t *testing.T) {
 	r := api.NewRouter()
 
-	t.Run("Valid registration returns token", func(t *testing.T) {
+	runWithVisitorCleanup(t, "Valid registration returns token", func(t *testing.T) {
 		t.Cleanup(clearAllUsersExceptAdmin)
 		data := handlers.CredentialsRequest{Username: "testuser", Password: "strongpassword"}
 		body, _ := json.Marshal(data)
@@ -102,7 +110,7 @@ func TestRegisterHandler(t *testing.T) {
 		}
 	})
 
-	t.Run("Duplicate username returns 409", func(t *testing.T) {
+	runWithVisitorCleanup(t, "Duplicate username returns 409", func(t *testing.T) {
 		t.Cleanup(clearAllUsersExceptAdmin)
 		data := handlers.CredentialsRequest{Username: "testuser", Password: "anotherpass"}
 		body, _ := json.Marshal(data)
@@ -125,7 +133,7 @@ func TestRegisterHandler(t *testing.T) {
 		}
 	})
 
-	t.Run("Too short password returns 400", func(t *testing.T) {
+	runWithVisitorCleanup(t, "Too short password returns 400", func(t *testing.T) {
 		data := handlers.CredentialsRequest{Username: "shortpass",
 			Password: "123"}
 		body, _ := json.Marshal(data)
