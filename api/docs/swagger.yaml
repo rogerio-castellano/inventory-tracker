@@ -232,6 +232,36 @@ paths:
       summary: Create user with custom role
       tags:
       - admin
+  /admin/users/{username}/tokens:
+    get:
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.RefreshTokenInfo'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: No sessions found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List refresh tokens for a specific user
+      tags:
+      - admin
   /login:
     post:
       consumes:

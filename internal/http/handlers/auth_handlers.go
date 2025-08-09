@@ -397,6 +397,39 @@ func LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// @Summary List refresh tokens for a specific user
+// @Tags admin
+// @Security BearerAuth
+// @Param username path string true "Username"
+// @Produce json
+// @Success 200 {array} RefreshTokenInfo
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "No sessions found"
+// @Router /admin/users/{username}/tokens [get]
+func ListUserTokensHandler(w http.ResponseWriter, r *http.Request) {
+	username := chi.URLParam(r, "username")
+
+	userSessions, ok := auth.GetRefreshToken(username)
+	if !ok {
+		http.Error(w, "Invalid username", http.StatusUnauthorized)
+		return
+	}
+
+	tokens := []RefreshTokenInfo{}
+	for _, entry := range userSessions {
+		tokens = append(tokens, RefreshTokenInfo{
+			Username:  username,
+			IssuedAt:  entry.CreatedAt,
+			ExpiresAt: entry.CreatedAt.Add(auth.RefreshTokenMaxAge),
+			IPAddress: entry.IPAddress,
+			UserAgent: entry.UserAgent,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tokens)
+}
+
 func sessionKey(ip, ua string) string {
 	h := sha256.New()
 	h.Write([]byte(ip + ua))

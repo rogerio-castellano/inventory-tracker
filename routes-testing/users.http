@@ -69,6 +69,10 @@ Authorization: Bearer {{token}}
 ###
 POST {{url}}/logout/all HTTP/1.1
 Authorization: Bearer {{token}}
+###
+GET {{url}}/admin/users/adrian/tokens HTTP/1.1
+Authorization: Bearer {{token}}
+Content-Type: application/json
 
 ###
 # Login with valid credentials (keep it after business endpoints)
