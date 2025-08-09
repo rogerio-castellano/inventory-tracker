@@ -136,9 +136,56 @@ func RedisRateLimitMiddleware(route string, maxRequests int, window time.Duratio
 	}
 }
 
+func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authorization := r.Header.Get("Authorization")
+			role := "guest"
+			if authorization != "" {
+				_, claims, err := auth.TokenClaims(authorization)
+				if err != nil {
+					http.Error(w, "Rate limit error", http.StatusInternalServerError)
+				}
+				if rRole, ok := claims["role"].(string); ok {
+					role = rRole
+				}
+			}
+
+			cfg := getRateLimitConfigForRole(role)
+
+			key, err := getClientIdentifier(r)
+			if err != nil {
+				http.Error(w, "Rate limit error", http.StatusInternalServerError)
+				return
+			}
+			key = fmt.Sprintf("ratelimit:%s:%s:%s", route, role, key)
+
+			count, ttl, err := incrementWithTTL(key, cfg.Window)
+			if err != nil {
+				http.Error(w, "Rate limit error", http.StatusInternalServerError)
+				return
+			}
+
+			remaining := max(cfg.MaxRequests-int(count), 0)
+
+			// Headers
+			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", cfg.MaxRequests))
+			w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
+			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", int(ttl.Seconds())))
+
+			if count > int64(cfg.MaxRequests) {
+				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(ttl.Seconds())))
+				http.Error(w, "Too many requests", http.StatusTooManyRequests)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func getRateLimitKey(r *http.Request, route string) (string, error) {
 	authorization := r.Header.Get("Authorization")
-	fmt.Println("authorization", authorization)
 
 	if strings.HasPrefix(authorization, "Bearer ") {
 		_, claims, err := auth.TokenClaims(authorization)
@@ -146,8 +193,8 @@ func getRateLimitKey(r *http.Request, route string) (string, error) {
 			return "", err
 		}
 
-		if _, ok := claims["username"].(string); ok {
-			return fmt.Sprintf("ratelimit:%s:%s", route, claims["username"]), nil
+		if username, ok := claims["username"].(string); ok {
+			return fmt.Sprintf("ratelimit:%s:%s", route, username), nil
 		}
 	}
 
@@ -157,4 +204,63 @@ func getRateLimitKey(r *http.Request, route string) (string, error) {
 	}
 
 	return fmt.Sprintf("ratelimit:%s:%s", route, host), nil
+}
+
+type RateLimitConfig struct {
+	MaxRequests int
+	Window      time.Duration
+}
+
+func getRateLimitConfigForRole(role string) RateLimitConfig {
+	switch role {
+	case "admin":
+		return RateLimitConfig{MaxRequests: 20, Window: time.Minute}
+	case "user":
+		return RateLimitConfig{MaxRequests: 10, Window: time.Minute}
+	default:
+		return RateLimitConfig{MaxRequests: 3, Window: time.Minute} // guests or unknown
+	}
+}
+
+func getClientIdentifier(r *http.Request) (string, error) {
+	authorization := r.Header.Get("Authorization")
+	fmt.Println("authorization", authorization)
+
+	if strings.HasPrefix(authorization, "Bearer ") {
+		_, claims, err := auth.TokenClaims(authorization)
+		if err != nil {
+			return "", err
+		}
+
+		if username, ok := claims["username"].(string); ok {
+			return username, nil
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return "", fmt.Errorf("invalid remote address %v", r.RemoteAddr)
+	}
+	//Fallback
+	return host, nil
+}
+
+func incrementWithTTL(key string, window time.Duration) (int64, time.Duration, error) {
+	rdb := handlers.AuthSvc.Rdb()
+	ctx := handlers.AuthSvc.Ctx()
+
+	pipe := rdb.TxPipeline()
+	countCmd := pipe.Incr(ctx, key)
+	ttlCmd := pipe.TTL(ctx, key)
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	ttl := ttlCmd.Val()
+	if countCmd.Val() == 1 || ttl < 0 {
+		rdb.Expire(ctx, key, window)
+		ttl = window
+	}
+
+	return countCmd.Val(), ttl, nil
 }
