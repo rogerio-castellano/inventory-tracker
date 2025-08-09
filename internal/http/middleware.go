@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -65,4 +66,21 @@ func RequireRoles(allowedRoles ...string) func(http.Handler) http.Handler {
 			http.Error(w, "Forbidden: insufficient permissions", http.StatusForbidden)
 		})
 	}
+}
+
+func RateLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			http.Error(w, "Invalid remote address", http.StatusInternalServerError)
+			return
+		}
+
+		limiter := getVisitor(host)
+		if !limiter.Allow() {
+			http.Error(w, "Too many requests", http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

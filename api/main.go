@@ -22,6 +22,7 @@ import (
 // @name Authorization
 func main() {
 	go auth.StartRefreshTokenCleaner(30 * time.Minute)
+	go httpRoutes.CleanupVisitors()
 
 	database, err := db.Connect()
 	if err != nil {

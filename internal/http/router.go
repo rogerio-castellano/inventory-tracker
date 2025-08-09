@@ -19,8 +19,8 @@ func NewRouter() http.Handler {
 	r.Get("/products/{id}/movements", handlers.GetMovementsHandler)
 	r.Get("/products/{id}/movements/export", handlers.ExportMovementsHandler)
 
-	r.Post("/login", handlers.LoginHandler)
-	r.Post("/register", handlers.RegisterHandler)
+	r.With(RateLimitMiddleware).Post("/login", handlers.LoginHandler)
+	r.With(RateLimitMiddleware).Post("/register", handlers.RegisterHandler)
 
 	r.Route("/metrics", func(r chi.Router) {
 		r.Use(AuthMiddleware, RequireRole("admin"))
@@ -52,7 +52,7 @@ func NewRouter() http.Handler {
 		r.Get("/users/{username}/tokens", handlers.ListUserTokensHandler)
 		r.Delete("/users/{username}/tokens", handlers.RevokeAllUserSessionsHandler)
 		r.Delete("/users/{username}/tokens/{sessionKey}", handlers.RevokeUserSessionHandler)
-		r.Post("/users/{username}/tokens", handlers.AdminImpersonateUserHandler)
+		r.With(RateLimitMiddleware).Post("/users/{username}/tokens", handlers.AdminImpersonateUserHandler)
 	})
 
 	r.Get("/swagger/*", httpSwagger.Handler(
