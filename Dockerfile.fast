@@ -1,0 +1,8 @@
+FROM alpine:3.22
+
+WORKDIR /app
+COPY inventory-api .
+RUN chmod +x inventory-api
+
+EXPOSE 8080
+ENTRYPOINT ["./inventory-api"]

@@ -3,13 +3,13 @@ IMAGE_NAME = inventory-tracker
 PWD = $(shell pwd)
 
 .SHELL := bash
-.PHONY: help build up down logs migrate-dev migrate-test test setup clean ci-setup ci-test ci-local dev-setup
+.PHONY: help build-go test fast-test lint docs 
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk "BEGIN {FS = \":.*?## \"}; {printf \"%-20s %s\\n\", \$$1, \$$2}"
 
 # Go targets
-b:build-go
+bg:build-go
 build-go:
 	@start=$$(date +%s); \
 	go build ./api/main.go; \
@@ -26,11 +26,21 @@ fast-test: ## Run unit tests
 lint:
 	golangci-lint run
 
-.PHONY: docs
 docs:
 	swag init -g api/main.go --output api/docs
 
+.PHONY: docker-build-dev build up down logs migrate-dev setup clean ci-setup ci-test ci-local dev-setup
+
 # Docker targets
+b:docker-build-dev
+docker-build-dev:
+	@start=$$(date +%s); \
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o inventory-api ./api/main.go; \
+	docker compose -f docker-compose.yml -f docker-compose-fast.yml build; \
+	end=$$(date +%s); \
+	echo "$$((end - start)) seconds to build locally and in the container"
+	docker-compose -f docker-compose.yml -f docker-compose-fast.yml up api
+
 bd: build
 build: ## Build the application
 	docker compose build
@@ -48,7 +58,6 @@ logs: ## Show application logs
 
 migrate-dev: ## Run migrations for development
 	docker compose exec api soda migrate -e development
-
 
 setup: ## Setup databases and run migrations
 	docker compose exec api bash ./scripts/setup-db.sh
