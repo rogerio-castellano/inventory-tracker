@@ -388,7 +388,7 @@ func LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	username := claims["username"].(string)
 
-	if _, ok := auth.GetRefreshTokens()[username]; !ok {
+	if _, ok := auth.GetRefreshToken(username); !ok {
 		http.Error(w, "No active sessions", http.StatusNotFound)
 		return
 	}
@@ -479,6 +479,62 @@ func RevokeUserSessionHandler(w http.ResponseWriter, r *http.Request) {
 
 	auth.RemoveRefreshToken(username, sessionKey)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// @Summary Issue token for user (impersonation)
+// @Tags admin
+// @Security BearerAuth
+// @Param username path string true "Username to impersonate"
+// @Success 200 {object} map[string]string
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "User not found"
+// @Failure 500 {string} string "Failed to generate token"
+// @Router /admin/users/{username}/tokens [post]
+func AdminImpersonateUserHandler(w http.ResponseWriter, r *http.Request) {
+
+	username := chi.URLParam(r, "username")
+
+	user, err := userRepo.GetByUsername(username)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		http.Error(w, "Invalid remote address", http.StatusInternalServerError)
+		return
+	}
+	ua := r.UserAgent()
+	key := sessionKey(host, ua)
+
+	authorization := r.Header.Get("Authorization")
+	_, claims, err := TokenClaims(authorization)
+	if err != nil {
+		log.Printf("Error getting claims: %v", err)
+	}
+	impersonator := claims["username"].(string)
+
+	// Issue new access token
+	accessToken, err := auth.GenerateImpersonationToken(user, impersonator)
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	// Optional: mark token as impersonated via claims (for audit log, future)
+	refreshToken := generateRandomToken()
+
+	auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
+		Token:     refreshToken,
+		IPAddress: host,
+		UserAgent: ua,
+	})
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+	})
 }
 
 func sessionKey(ip, ua string) string {

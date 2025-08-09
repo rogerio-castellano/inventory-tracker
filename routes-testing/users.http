@@ -86,6 +86,10 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 ###
+POST {{url}}/admin/users/adrian/tokens HTTP/1.1
+Authorization: Bearer {{token}}
+
+###
 # Login with valid credentials (keep it after business endpoints)
 # @name login
 POST {{url}}/login HTTP/1.1
