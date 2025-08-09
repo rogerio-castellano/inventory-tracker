@@ -191,11 +191,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	ua := r.UserAgent()
 	key := sessionKey(host, ua)
-	auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
+	err = auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
 		Token:     refreshToken,
 		IPAddress: host,
 		UserAgent: ua,
 	})
+	if err != nil {
+		log.Printf("Failed to set refresh token: %v", err)
+	}
 
 	err = writeJSON(w, http.StatusOK, LoginResult{AccessToken: accessToken, RefreshToken: refreshToken})
 	if err != nil {
@@ -251,9 +254,14 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	ua := r.UserAgent()
 	key := sessionKey(host, ua)
-	userSessions, ok := auth.GetRefreshToken(req.Username)
+	userSessions, ok, err := auth.GetRefreshToken(key)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+
+	}
 	if !ok {
-		http.Error(w, "Invalid username", http.StatusUnauthorized)
+		http.Error(w, "No active sessions", http.StatusNotFound)
 		return
 	}
 	stored, ok := userSessions[key]
@@ -263,7 +271,10 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if time.Since(stored.CreatedAt) > auth.RefreshTokenMaxAge {
-		auth.RemoveRefreshToken(req.Username, key)
+		if err := auth.RemoveRefreshToken(req.Username, key); err != nil {
+			http.Error(w, "Failed to handle refresh token", http.StatusInternalServerError)
+			return
+		}
 		http.Error(w, "Refresh token expired", http.StatusUnauthorized)
 		return
 	}
@@ -282,11 +293,14 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Rotate refresh token
 	newRefreshToken := generateRandomToken()
-	auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
+	err = auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
 		Token:     newRefreshToken,
 		IPAddress: host,
 		UserAgent: ua,
 	})
+	if err != nil {
+		log.Printf("Failed to set refresh token: %v", err)
+	}
 
 	if err := writeJSON(w, http.StatusOK, LoginResult{AccessToken: newToken, RefreshToken: newRefreshToken}); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
@@ -302,8 +316,13 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 // @Router /admin/tokens [get]
 func ListRefreshTokensHandler(w http.ResponseWriter, r *http.Request) {
 	tokens := []RefreshTokenInfo{}
+	refreshTokens, err := auth.GetRefreshTokens()
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
 
-	for username, sessions := range auth.GetRefreshTokens() {
+	for username, sessions := range refreshTokens {
 		for _, entry := range sessions {
 			tokens = append(tokens, RefreshTokenInfo{
 				Username:  username,
@@ -318,7 +337,6 @@ func ListRefreshTokensHandler(w http.ResponseWriter, r *http.Request) {
 	if err := writeJSON(w, http.StatusOK, tokens); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
-
 }
 
 // @Summary Revoke a user’s refresh token
@@ -331,9 +349,13 @@ func ListRefreshTokensHandler(w http.ResponseWriter, r *http.Request) {
 // @Router /admin/tokens/{username} [delete]
 func RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	username := chi.URLParam(r, "username")
-
-	if _, ok := auth.GetRefreshToken(username); !ok {
-		http.Error(w, "Token not found", http.StatusNotFound)
+	_, ok, err := auth.GetRefreshToken(username)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		http.Error(w, "No active sessions", http.StatusNotFound)
 		return
 	}
 
@@ -369,7 +391,10 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	ua := r.UserAgent()
 	key := sessionKey(host, ua)
-	auth.RemoveRefreshToken(username, key)
+	if err := auth.RemoveRefreshToken(username, key); err != nil {
+		http.Error(w, "Failed to handle refresh token", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -390,11 +415,19 @@ func LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	username := claims["username"].(string)
 
-	if _, ok := auth.GetRefreshToken(username); !ok {
+	_, ok, err := auth.GetRefreshToken(username)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if !ok {
 		http.Error(w, "No active sessions", http.StatusNotFound)
 		return
 	}
-	auth.RemoveUserRefreshTokens(username)
+	if err := auth.RemoveUserRefreshTokens(username); err != nil {
+		http.Error(w, "Failed to handle refresh token", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -411,9 +444,14 @@ func LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 func ListUserTokensHandler(w http.ResponseWriter, r *http.Request) {
 	username := chi.URLParam(r, "username")
 
-	userSessions, ok := auth.GetRefreshToken(username)
+	userSessions, ok, err := auth.GetRefreshToken(username)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+
+	}
 	if !ok {
-		http.Error(w, "No active sessions", http.StatusUnauthorized)
+		http.Error(w, "No active sessions", http.StatusNotFound)
 		return
 	}
 
@@ -429,8 +467,9 @@ func ListUserTokensHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokens)
+	if err := writeJSON(w, http.StatusOK, tokens); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 // @Summary Revoke all sessions for a user
@@ -445,11 +484,20 @@ func ListUserTokensHandler(w http.ResponseWriter, r *http.Request) {
 func RevokeAllUserSessionsHandler(w http.ResponseWriter, r *http.Request) {
 	username := chi.URLParam(r, "username")
 
-	if _, ok := auth.GetRefreshToken(username); !ok {
+	_, ok, err := auth.GetRefreshToken(username)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if !ok {
 		http.Error(w, "No active sessions", http.StatusNotFound)
 		return
 	}
-	auth.RemoveUserRefreshTokens(username)
+
+	if err := auth.RemoveUserRefreshTokens(username); err != nil {
+		http.Error(w, "Failed to handle refresh token", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -468,18 +516,22 @@ func RevokeUserSessionHandler(w http.ResponseWriter, r *http.Request) {
 	username := chi.URLParam(r, "username")
 	sessionKey := chi.URLParam(r, "sessionKey")
 
-	userSessions, ok := auth.GetRefreshToken(username)
+	_, ok, err := auth.GetRefreshToken(username)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+
+	}
 	if !ok {
-		http.Error(w, "No active sessions", http.StatusUnauthorized)
+		http.Error(w, "No active sessions", http.StatusNotFound)
 		return
 	}
 
-	if _, ok := userSessions[sessionKey]; !ok {
-		http.Error(w, "Session not found", http.StatusNotFound)
+	if err := auth.RemoveRefreshToken(username, sessionKey); err != nil {
+		http.Error(w, "Failed to handle refresh token", http.StatusInternalServerError)
 		return
 	}
 
-	auth.RemoveRefreshToken(username, sessionKey)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -527,11 +579,14 @@ func AdminImpersonateUserHandler(w http.ResponseWriter, r *http.Request) {
 	// Optional: mark token as impersonated via claims (for audit log, future)
 	refreshToken := generateRandomToken()
 
-	auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
+	err = auth.SetRefreshToken(user.Username, key, auth.RefreshTokenEntry{
 		Token:     refreshToken,
 		IPAddress: host,
 		UserAgent: ua,
 	})
+	if err != nil {
+		log.Printf("Failed to set refresh token: %v", err)
+	}
 
 	if err := writeJSON(w, http.StatusOK, LoginResult{AccessToken: accessToken, RefreshToken: refreshToken}); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)

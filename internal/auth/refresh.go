@@ -22,12 +22,16 @@ const RefreshTokenMaxAge = 7 * 24 * time.Hour // 7 days
 var tokenStore = map[string]map[string]RefreshTokenEntry{}
 var mu sync.Mutex
 
-func GetRefreshToken(username string) (map[string]RefreshTokenEntry, bool) {
-	token, ok := GetRefreshTokens()[username]
-	return token, ok
+func GetRefreshToken(username string) (map[string]RefreshTokenEntry, bool, error) {
+	tokens, err := GetRefreshTokens()
+	if err != nil {
+		return map[string]RefreshTokenEntry{}, false, err
+	}
+	token, ok := tokens[username]
+	return token, ok, nil
 }
 
-func GetRefreshTokens() map[string]map[string]RefreshTokenEntry {
+func GetRefreshTokens() (map[string]map[string]RefreshTokenEntry, error) {
 	if len(tokenStore) == 0 {
 		exists, err := fileExists(refreshTokenFile)
 		if err != nil {
@@ -35,11 +39,13 @@ func GetRefreshTokens() map[string]map[string]RefreshTokenEntry {
 		}
 
 		if exists {
-			loadRefreshTokens()
+			if err := loadRefreshTokens(); err != nil {
+				return map[string]map[string]RefreshTokenEntry{}, err
+			}
 		}
 	}
 
-	return tokenStore
+	return tokenStore, nil
 }
 
 func fileExists(path string) (bool, error) {
@@ -54,7 +60,7 @@ func fileExists(path string) (bool, error) {
 	return false, err
 }
 
-func SetRefreshToken(username, key string, token RefreshTokenEntry) {
+func SetRefreshToken(username, key string, token RefreshTokenEntry) error {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -65,7 +71,7 @@ func SetRefreshToken(username, key string, token RefreshTokenEntry) {
 	}
 	tokenStore[username][key] = token
 
-	saveRefreshTokens()
+	return saveRefreshTokens()
 }
 
 func RemoveRefreshToken(username string, key string) error {
@@ -77,16 +83,15 @@ func RemoveRefreshToken(username string, key string) error {
 			delete(tokenStore, username)
 		}
 	}
-	err := saveRefreshTokens()
-	return err
+
+	return saveRefreshTokens()
 }
 
 func RemoveUserRefreshTokens(username string) error {
 	mu.Lock()
 	defer mu.Unlock()
 	delete(tokenStore, username)
-	err := saveRefreshTokens()
-	return err
+	return saveRefreshTokens()
 }
 
 func loadRefreshTokens() error {
