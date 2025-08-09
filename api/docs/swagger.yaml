@@ -233,6 +233,33 @@ paths:
       tags:
       - admin
   /admin/users/{username}/tokens:
+    delete:
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      responses:
+        "204":
+          description: All sessions revoked
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: No active sessions
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Revoke all sessions for a user
+      tags:
+      - admin
     get:
       parameters:
       - description: Username

@@ -303,7 +303,7 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 func ListRefreshTokensHandler(w http.ResponseWriter, r *http.Request) {
 	tokens := []RefreshTokenInfo{}
 
-	for username, sessions := range auth.GetrefreshTokens() {
+	for username, sessions := range auth.GetRefreshTokens() {
 		for _, entry := range sessions {
 			tokens = append(tokens, RefreshTokenInfo{
 				Username:  username,
@@ -388,7 +388,7 @@ func LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	username := claims["username"].(string)
 
-	if _, ok := auth.GetrefreshTokens()[username]; !ok {
+	if _, ok := auth.GetRefreshTokens()[username]; !ok {
 		http.Error(w, "No active sessions", http.StatusNotFound)
 		return
 	}
@@ -411,7 +411,7 @@ func ListUserTokensHandler(w http.ResponseWriter, r *http.Request) {
 
 	userSessions, ok := auth.GetRefreshToken(username)
 	if !ok {
-		http.Error(w, "Invalid username", http.StatusUnauthorized)
+		http.Error(w, "No active sessions", http.StatusUnauthorized)
 		return
 	}
 
@@ -428,6 +428,27 @@ func ListUserTokensHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tokens)
+}
+
+// @Summary Revoke all sessions for a user
+// @Tags admin
+// @Security BearerAuth
+// @Param username path string true "Username"
+// @Success 204 "All sessions revoked"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "No active sessions"
+// @Failure 500 {string} string "Internal error"
+// @Router /admin/users/{username}/tokens [delete]
+func RevokeAllUserSessionsHandler(w http.ResponseWriter, r *http.Request) {
+	username := chi.URLParam(r, "username")
+
+	if _, ok := auth.GetRefreshToken(username); !ok {
+		http.Error(w, "No active sessions", http.StatusNotFound)
+		return
+	}
+	auth.RemoveUserRefreshTokens(username)
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func sessionKey(ip, ua string) string {

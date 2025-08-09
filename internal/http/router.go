@@ -27,6 +27,8 @@ func NewRouter() http.Handler {
 		r.Get("/dashboard", handlers.GetDashboardMetricsHandler)
 	})
 
+	r.Post("/refresh", handlers.RefreshHandler)
+
 	r.Group(func(r chi.Router) {
 		r.Use(AuthMiddleware)
 
@@ -38,23 +40,22 @@ func NewRouter() http.Handler {
 
 		r.Post("/logout", handlers.LogoutHandler)
 		r.Post("/logout/all", handlers.LogoutAllHandler)
+
+		r.Get("/me", handlers.MeHandler)
 	})
 
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(AuthMiddleware, RequireRole("admin"))
 		r.Post("/users", handlers.RegisterAsAdminHandler)
-		r.Get("/users/{username}/tokens", handlers.ListUserTokensHandler)
 		r.Get("/tokens", handlers.ListRefreshTokensHandler)
 		r.Delete("/tokens/{username}", handlers.RevokeRefreshTokenHandler)
+		r.Get("/users/{username}/tokens", handlers.ListUserTokensHandler)
+		r.Delete("/users/{username}/tokens", handlers.RevokeAllUserSessionsHandler)
 	})
 
 	r.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("http://localhost:8080/swagger/doc.json"), //The url pointing to API definition
 	))
-
-	r.With(AuthMiddleware).Get("/me", handlers.MeHandler)
-
-	r.Post("/refresh", handlers.RefreshHandler)
 
 	return r
 }

@@ -23,11 +23,11 @@ var tokenStore = map[string]map[string]RefreshTokenEntry{}
 var mu sync.Mutex
 
 func GetRefreshToken(username string) (map[string]RefreshTokenEntry, bool) {
-	token, ok := GetrefreshTokens()[username]
+	token, ok := GetRefreshTokens()[username]
 	return token, ok
 }
 
-func GetrefreshTokens() map[string]map[string]RefreshTokenEntry {
+func GetRefreshTokens() map[string]map[string]RefreshTokenEntry {
 	if len(tokenStore) == 0 {
 		exists, err := fileExists(refreshTokenFile)
 		if err != nil {
