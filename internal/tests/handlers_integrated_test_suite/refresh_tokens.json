@@ -1,0 +1,18 @@
+{
+  "UserRole": {
+    "37fcff24bf62035b2b08020afc08b4fecd4fcffce57ab23518e3561ff0fe76b9": {
+      "token": "040e2456095504a38d991c047f2bf85da03eaad8751b0f112e9d8bdeb51c3b5b",
+      "created_at": "2025-08-09T18:41:24.017614+02:00",
+      "ip_address": "192.0.2.1",
+      "user_agent": ""
+    }
+  },
+  "admin": {
+    "37fcff24bf62035b2b08020afc08b4fecd4fcffce57ab23518e3561ff0fe76b9": {
+      "token": "d6c8d1968a41ad011c209677bcf976420545e04e1564fdb885e3965c426fbaed",
+      "created_at": "2025-08-09T18:41:23.5474241+02:00",
+      "ip_address": "192.0.2.1",
+      "user_agent": ""
+    }
+  }
+}

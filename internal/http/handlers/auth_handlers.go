@@ -212,7 +212,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 // @Router /me [get]
 func MeHandler(w http.ResponseWriter, r *http.Request) {
 	authorization := r.Header.Get("Authorization")
-	_, claims, err := TokenClaims(authorization)
+	_, claims, err := auth.TokenClaims(authorization)
 	if err != nil {
 		log.Printf("Error getting claims: %v", err)
 	}
@@ -315,8 +315,10 @@ func ListRefreshTokensHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokens)
+	if err := writeJSON(w, http.StatusOK, tokens); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
+
 }
 
 // @Summary Revoke a user’s refresh token
@@ -353,7 +355,7 @@ func RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 // @Router /logout [post]
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	authorization := r.Header.Get("Authorization")
-	_, claims, err := TokenClaims(authorization)
+	_, claims, err := auth.TokenClaims(authorization)
 	if err != nil {
 		log.Printf("Error getting claims: %v", err)
 	}
@@ -382,7 +384,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 // @Router /logout/all [post]
 func LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	authorization := r.Header.Get("Authorization")
-	_, claims, err := TokenClaims(authorization)
+	_, claims, err := auth.TokenClaims(authorization)
 	if err != nil {
 		log.Printf("Error getting claims: %v", err)
 	}
@@ -509,7 +511,7 @@ func AdminImpersonateUserHandler(w http.ResponseWriter, r *http.Request) {
 	key := sessionKey(host, ua)
 
 	authorization := r.Header.Get("Authorization")
-	_, claims, err := TokenClaims(authorization)
+	_, claims, err := auth.TokenClaims(authorization)
 	if err != nil {
 		log.Printf("Error getting claims: %v", err)
 	}
@@ -531,10 +533,9 @@ func AdminImpersonateUserHandler(w http.ResponseWriter, r *http.Request) {
 		UserAgent: ua,
 	})
 
-	json.NewEncoder(w).Encode(map[string]string{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-	})
+	if err := writeJSON(w, http.StatusOK, LoginResult{AccessToken: accessToken, RefreshToken: refreshToken}); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 func sessionKey(ip, ua string) string {

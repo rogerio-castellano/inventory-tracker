@@ -3,13 +3,13 @@ package http
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 )
 
@@ -19,13 +19,13 @@ const userIDKey = contextKey("user_id")
 
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if !strings.HasPrefix(auth, "Bearer ") {
+		authorization := r.Header.Get("Authorization")
+		if !strings.HasPrefix(authorization, "Bearer ") {
 			http.Error(w, "missing or invalid token", http.StatusUnauthorized)
 			return
 		}
 
-		token, claims, err := handlers.TokenClaims(auth)
+		token, claims, err := auth.TokenClaims(authorization)
 		if err != nil || !token.Valid {
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
@@ -91,26 +91,42 @@ func RateLimitMiddleware(next http.Handler) http.Handler {
 func RedisRateLimitMiddleware(route string, maxRequests int, window time.Duration) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			host, _, err := net.SplitHostPort(r.RemoteAddr)
+			rdb := handlers.AuthSvc.Rdb()
+			ctx := handlers.AuthSvc.Ctx()
+			key, err := getRateLimitKey(r, route)
 			if err != nil {
-				http.Error(w, "Invalid remote address", http.StatusInternalServerError)
+				http.Error(w, "missing or invalid token", http.StatusUnauthorized)
 				return
 			}
-			authSvc := handlers.AuthSvc
-			key := fmt.Sprintf("ratelimit:%s:%s", route, host)
-			count, err := authSvc.Rdb().Incr(authSvc.Ctx(), key).Result()
+
+			pipe := rdb.TxPipeline()
+			countCmd := pipe.Incr(ctx, key)
+			ttlCmd := pipe.TTL(ctx, key)
+			_, err = pipe.Exec(ctx)
 			if err != nil {
-				log.Println("**** error incr", err)
 				http.Error(w, "Rate limit error", http.StatusInternalServerError)
 				return
 			}
 
-			if count == 1 {
-				authSvc.Rdb().Expire(authSvc.Ctx(), key, window)
+			count := countCmd.Val()
+			ttl := ttlCmd.Val()
+
+			// Set expiration if it's a new key
+			if count == 1 || ttl < 0 {
+				rdb.Expire(ctx, key, window)
+				ttl = window
 			}
 
+			remaining := max(maxRequests-int(count), 0)
+
+			// Set rate limit headers
+			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", maxRequests))
+			w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
+			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", int(ttl.Seconds())))
+
+			// If over limit
 			if count > int64(maxRequests) {
-				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(window.Seconds())))
+				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(ttl.Seconds())))
 				http.Error(w, "Too many requests", http.StatusTooManyRequests)
 				return
 			}
@@ -118,4 +134,27 @@ func RedisRateLimitMiddleware(route string, maxRequests int, window time.Duratio
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func getRateLimitKey(r *http.Request, route string) (string, error) {
+	authorization := r.Header.Get("Authorization")
+	fmt.Println("authorization", authorization)
+
+	if strings.HasPrefix(authorization, "Bearer ") {
+		_, claims, err := auth.TokenClaims(authorization)
+		if err != nil {
+			return "", err
+		}
+
+		if _, ok := claims["username"].(string); ok {
+			return fmt.Sprintf("ratelimit:%s:%s", route, claims["username"]), nil
+		}
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return "", fmt.Errorf("invalid remote address %v", r.RemoteAddr)
+	}
+
+	return fmt.Sprintf("ratelimit:%s:%s", route, host), nil
 }

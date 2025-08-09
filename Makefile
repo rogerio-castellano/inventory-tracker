@@ -38,8 +38,9 @@ docker-build-dev:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o inventory-api ./api/main.go; \
 	docker compose -f docker-compose.yml -f docker-compose-fast.yml build; \
 	end=$$(date +%s); \
-	echo "$$((end - start)) seconds to build locally and in the container"
-	docker-compose -f docker-compose.yml -f docker-compose-fast.yml up api
+	echo "Build completed in $$((end - start))s (local + container)"
+	docker-compose down api
+	docker-compose -f docker-compose.yml -f docker-compose-fast.yml up -d api
 
 bd: build
 build: ## Build the application

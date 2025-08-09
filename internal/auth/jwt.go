@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -17,6 +18,20 @@ func GenerateImpersonationToken(user models.User, impersonator string) (string, 
 	return buildTokenWithClaims(user, impersonator)
 }
 
+func TokenClaims(auth string) (*jwt.Token, jwt.MapClaims, error) {
+	tokenStr := strings.TrimPrefix(auth, "Bearer ")
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+		return []byte("super-secret-key"), nil
+	})
+
+	if err != nil || !token.Valid {
+		return nil, nil, err
+	}
+	claims := token.Claims.(jwt.MapClaims)
+
+	return token, claims, nil
+}
+
 func buildTokenWithClaims(user models.User, impersonator string) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":      user.ID,
@@ -31,10 +46,4 @@ func buildTokenWithClaims(user models.User, impersonator string) (string, error)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtSecret)
-}
-
-func ParseToken(tokenStr string) (*jwt.Token, error) {
-	return jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-		return jwtSecret, nil
-	})
 }

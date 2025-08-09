@@ -5,14 +5,14 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 )
 
 func GetRoleFromContext(r *http.Request) (string, error) {
-	auth := r.Header.Get("Authorization")
-	_, claims, err := TokenClaims(auth)
+	authorization := r.Header.Get("Authorization")
+
+	_, claims, err := auth.TokenClaims(authorization)
 	if err != nil {
 		return "", err
 	}
@@ -21,20 +21,6 @@ func GetRoleFromContext(r *http.Request) (string, error) {
 		return role, nil
 	}
 	return "", nil
-}
-
-func TokenClaims(auth string) (*jwt.Token, jwt.MapClaims, error) {
-	tokenStr := strings.TrimPrefix(auth, "Bearer ")
-	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-		return []byte("super-secret-key"), nil
-	})
-
-	if err != nil || !token.Valid {
-		return nil, nil, err
-	}
-	claims := token.Claims.(jwt.MapClaims)
-
-	return token, claims, nil
 }
 
 // readJSON tries to read the body of a request and converts it into JSON
