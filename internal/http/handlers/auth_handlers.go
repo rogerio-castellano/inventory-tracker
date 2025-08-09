@@ -293,16 +293,6 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func generateRandomToken() string {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		// Handle error gracefully — fallback, panic, or log
-		log.Printf("Failed to generate random bytes: %v", err)
-		return ""
-	}
-	return hex.EncodeToString(b)
-}
-
 // @Summary List active refresh tokens
 // @Tags admin
 // @Security BearerAuth
@@ -382,6 +372,14 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// @Summary Logout from all devices (invalidate all refresh tokens)
+// @Tags auth
+// @Security BearerAuth
+// @Success 204 "All sessions revoked"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "No active sessions"
+// @Failure 500 {string} string "Internal error"
+// @Router /logout/all [post]
 func LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	authorization := r.Header.Get("Authorization")
 	_, claims, err := TokenClaims(authorization)
@@ -403,4 +401,14 @@ func sessionKey(ip, ua string) string {
 	h := sha256.New()
 	h.Write([]byte(ip + ua))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func generateRandomToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// Handle error gracefully — fallback, panic, or log
+		log.Printf("Failed to generate random bytes: %v", err)
+		return ""
+	}
+	return hex.EncodeToString(b)
 }

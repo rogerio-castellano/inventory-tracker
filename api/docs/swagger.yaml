@@ -265,6 +265,50 @@ paths:
       summary: Authenticate user and return JWT token
       tags:
       - auth
+  /logout:
+    post:
+      responses:
+        "204":
+          description: Logged out
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Session not found
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Logout (invalidate refresh token for this session)
+      tags:
+      - auth
+  /logout/all:
+    post:
+      responses:
+        "204":
+          description: All sessions revoked
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: No active sessions
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Logout from all devices (invalidate all refresh tokens)
+      tags:
+      - auth
   /me:
     get:
       produces:
