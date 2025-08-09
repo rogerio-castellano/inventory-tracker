@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
@@ -9,6 +10,7 @@ var (
 	movementRepo repo.MovementRepository
 	metricsRepo  repo.MetricsRepository
 	userRepo     repo.UserRepository
+	AuthSvc      *auth.AuthService
 )
 
 func SetProductRepo(r repo.ProductRepository) {
@@ -25,4 +27,8 @@ func SetMetricsRepo(r repo.MetricsRepository) {
 
 func SetUserRepo(r repo.UserRepository) {
 	userRepo = r
+}
+
+func SetAuthService(a *auth.AuthService) {
+	AuthSvc = a
 }

@@ -2,10 +2,13 @@ package http
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 )
@@ -83,4 +86,36 @@ func RateLimitMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func RedisRateLimitMiddleware(route string, maxRequests int, window time.Duration) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			host, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				http.Error(w, "Invalid remote address", http.StatusInternalServerError)
+				return
+			}
+			authSvc := handlers.AuthSvc
+			key := fmt.Sprintf("ratelimit:%s:%s", route, host)
+			count, err := authSvc.Rdb().Incr(authSvc.Ctx(), key).Result()
+			if err != nil {
+				log.Println("**** error incr", err)
+				http.Error(w, "Rate limit error", http.StatusInternalServerError)
+				return
+			}
+
+			if count == 1 {
+				authSvc.Rdb().Expire(authSvc.Ctx(), key, window)
+			}
+
+			if count > int64(maxRequests) {
+				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(window.Seconds())))
+				http.Error(w, "Too many requests", http.StatusTooManyRequests)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }

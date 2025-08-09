@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
-	httpapp "github.com/rogerio-castellano/inventory-tracker/internal/http"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 )
 
 func runWithVisitorCleanup(t *testing.T, name string, testFunc func(t *testing.T)) {
 	t.Run(name, func(t *testing.T) {
-		httpapp.CleanupAllVisitors()
+		api.CleanupAllVisitors()
+		handlers.AuthSvc.Rdb().FlushDB(handlers.AuthSvc.Ctx())
 		testFunc(t)
 	})
 }

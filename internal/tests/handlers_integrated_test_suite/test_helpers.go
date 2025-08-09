@@ -12,9 +12,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/db"
 	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
-	handler "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
 	"golang.org/x/crypto/bcrypt"
@@ -40,6 +42,17 @@ func init() {
 }
 
 func setupTestRepos(password string) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	var ctx = context.Background()
+
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Fatalf("Could not connect to Redis: %v", err)
+	}
+	authService := auth.NewAuthService(rdb, ctx)
+	handlers.SetAuthService(authService)
+
 	dbUrl := os.Getenv("DATABASE_URL")
 	if dbUrl == "" {
 		os.Setenv("DATABASE_URL", "postgres://postgres:example@localhost:5432/inventory?sslmode=disable")
@@ -51,20 +64,20 @@ func setupTestRepos(password string) {
 	}
 
 	productRepo = repo.NewPostgresProductRepository(database)
-	handler.SetProductRepo(productRepo)
+	handlers.SetProductRepo(productRepo)
 
 	movementRepo = repo.NewPostgresMovementRepository(database)
-	handler.SetMovementRepo(movementRepo)
+	handlers.SetMovementRepo(movementRepo)
 
 	userRepo = repo.NewPostgresUserRepository(database)
-	handler.SetUserRepo(userRepo)
+	handlers.SetUserRepo(userRepo)
 
 	if err := createAdminIfNotExists(password); err != nil {
 		log.Fatal("❌ Could not create admin user:", err)
 	}
 
 	metricsRepo := repo.NewPostgresMetricsRepository(database)
-	handler.SetMetricsRepo(metricsRepo)
+	handlers.SetMetricsRepo(metricsRepo)
 }
 
 func createAdminIfNotExists(password string) error {
@@ -110,14 +123,14 @@ func userRoleToken(r http.Handler) (string, error) {
 }
 
 func generateToken(r http.Handler, username, password string) (string, error) {
-	payload := handler.CredentialsRequest{Username: username, Password: password}
+	payload := handlers.CredentialsRequest{Username: username, Password: password}
 	body, _ := json.Marshal(payload)
 
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	var resp handler.LoginResult
+	var resp handlers.LoginResult
 
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		return "", fmt.Errorf("token decoding failed: %v", err)
@@ -156,7 +169,7 @@ func clearAllUsersExceptAdmin() {
 	}
 }
 
-func createProduct(r http.Handler, p handler.ProductRequest) *httptest.ResponseRecorder {
+func createProduct(r http.Handler, p handlers.ProductRequest) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(p)
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -166,7 +179,7 @@ func createProduct(r http.Handler, p handler.ProductRequest) *httptest.ResponseR
 	return w
 }
 
-func adjustProduct(r http.Handler, productID int, adj handler.QuantityAdjustmentRequest) *httptest.ResponseRecorder {
+func adjustProduct(r http.Handler, productID int, adj handlers.QuantityAdjustmentRequest) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(adj)
 	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/products/%d/adjust", productID), bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)

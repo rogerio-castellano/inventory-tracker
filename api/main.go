@@ -1,16 +1,23 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/db"
-	httpRoutes "github.com/rogerio-castellano/inventory-tracker/internal/http"
-	routes "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
+
+var rdb = redis.NewClient(&redis.Options{
+	Addr: "inventory-redis:6379",
+})
+var ctx = context.Background()
 
 // @title Inventory Tracker API
 // @version 1.0
@@ -22,19 +29,25 @@ import (
 // @name Authorization
 func main() {
 	go auth.StartRefreshTokenCleaner(30 * time.Minute)
-	go httpRoutes.StartVisitorCleanupLoop()
+	go api.StartVisitorCleanupLoop()
+
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Fatalf("Could not connect to Redis: %v", err)
+	}
+
+	authService := auth.NewAuthService(rdb, ctx)
+	handlers.SetAuthService(authService)
 
 	database, err := db.Connect()
 	if err != nil {
 		log.Fatal("❌ Could not connect to database:", err)
 	}
 
-	routes.SetProductRepo(repo.NewPostgresProductRepository(database))
-	routes.SetMovementRepo(repo.NewPostgresMovementRepository(database))
-	routes.SetUserRepo(repo.NewPostgresUserRepository(database))
-	routes.SetMetricsRepo(repo.NewPostgresMetricsRepository(database))
-
-	r := httpRoutes.NewRouter()
+	handlers.SetProductRepo(repo.NewPostgresProductRepository(database))
+	handlers.SetMovementRepo(repo.NewPostgresMovementRepository(database))
+	handlers.SetUserRepo(repo.NewPostgresUserRepository(database))
+	handlers.SetMetricsRepo(repo.NewPostgresMetricsRepository(database))
+	r := api.NewRouter()
 	log.Println("✅ Server running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)
