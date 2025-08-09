@@ -27,7 +27,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
-
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     env:
       DATABASE_URL: postgres://postgres:example@localhost:5432/inventory?sslmode=disable
 
@@ -80,6 +88,7 @@ jobs:
           GO_ENV: test
           DATABASE_URL: postgres://postgres:example@localhost:5432/inventory?sslmode=disable
           PGPASSWORD: example
+          REDIS_ADDR: redis:6379
 
       - name: Build application
         run: go build -o bin/app ./api
