@@ -10,8 +10,11 @@ help: ## Show this help
 
 # Go targets
 b:build-go
-build-go:	
-	go build ./api/main.go
+build-go:
+	@start=$$(date +%s); \
+	go build ./api/main.go; \
+	end=$$(date +%s); \
+	echo "$$((end - start)) seconds to build"
 
 test: ## Run all tests
 	go test ./...
