@@ -90,6 +90,8 @@ definitions:
         type: string
       issued_at:
         type: string
+      session_key:
+        type: string
       user_agent:
         type: string
       username:
@@ -287,6 +289,39 @@ paths:
       security:
       - BearerAuth: []
       summary: List refresh tokens for a specific user
+      tags:
+      - admin
+  /admin/users/{username}/tokens/{sessionKey}:
+    delete:
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: Session key (IP+UA hash)
+        in: path
+        name: sessionKey
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Session revoked
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: User or session not found
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Revoke a specific session for a user
       tags:
       - admin
   /login:

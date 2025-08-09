@@ -51,6 +51,7 @@ func NewRouter() http.Handler {
 		r.Delete("/tokens/{username}", handlers.RevokeRefreshTokenHandler)
 		r.Get("/users/{username}/tokens", handlers.ListUserTokensHandler)
 		r.Delete("/users/{username}/tokens", handlers.RevokeAllUserSessionsHandler)
+		r.Delete("/users/{username}/tokens/{sessionKey}", handlers.RevokeUserSessionHandler)
 	})
 
 	r.Get("/swagger/*", httpSwagger.Handler(

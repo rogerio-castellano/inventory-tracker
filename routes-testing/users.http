@@ -52,7 +52,7 @@ Authorization: Bearer {{token}}
 ### Test tokens removal next 2 requests (POST and DELETE)
 POST {{url}}/login HTTP/1.1
 Content-Type: application/json
-User-Agent: rest-client1
+User-Agent: rest-client
 
 {
     "username": "adrian",
@@ -69,6 +69,7 @@ Authorization: Bearer {{token}}
 ###
 POST {{url}}/logout/all HTTP/1.1
 Authorization: Bearer {{token}}
+
 ###
 GET {{url}}/admin/users/adrian/tokens HTTP/1.1
 Authorization: Bearer {{token}}
@@ -79,8 +80,10 @@ DELETE {{url}}/admin/users/adrian/tokens HTTP/1.1
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-
-
+###
+DELETE {{url}}/admin/users/adrian/tokens/f403477957c61e99d7de9dc3d8d9da42c3e730ef5e96a8d9d43c27d28a7e7aad HTTP/1.1
+Authorization: Bearer {{token}}
+Content-Type: application/json
 
 ###
 # Login with valid credentials (keep it after business endpoints)

@@ -416,13 +416,14 @@ func ListUserTokensHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokens := []RefreshTokenInfo{}
-	for _, entry := range userSessions {
+	for sessionKey, entry := range userSessions {
 		tokens = append(tokens, RefreshTokenInfo{
-			Username:  username,
-			IssuedAt:  entry.CreatedAt,
-			ExpiresAt: entry.CreatedAt.Add(auth.RefreshTokenMaxAge),
-			IPAddress: entry.IPAddress,
-			UserAgent: entry.UserAgent,
+			SessionKey: sessionKey,
+			Username:   username,
+			IssuedAt:   entry.CreatedAt,
+			ExpiresAt:  entry.CreatedAt.Add(auth.RefreshTokenMaxAge),
+			IPAddress:  entry.IPAddress,
+			UserAgent:  entry.UserAgent,
 		})
 	}
 
@@ -448,6 +449,35 @@ func RevokeAllUserSessionsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	auth.RemoveUserRefreshTokens(username)
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// @Summary Revoke a specific session for a user
+// @Tags admin
+// @Security BearerAuth
+// @Param username path string true "Username"
+// @Param sessionKey path string true "Session key (IP+UA hash)"
+// @Success 204 "Session revoked"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "User or session not found"
+// @Failure 500 {string} string "Internal error"
+// @Router /admin/users/{username}/tokens/{sessionKey} [delete]
+func RevokeUserSessionHandler(w http.ResponseWriter, r *http.Request) {
+	username := chi.URLParam(r, "username")
+	sessionKey := chi.URLParam(r, "sessionKey")
+
+	userSessions, ok := auth.GetRefreshToken(username)
+	if !ok {
+		http.Error(w, "No active sessions", http.StatusUnauthorized)
+		return
+	}
+
+	if _, ok := userSessions[sessionKey]; !ok {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	auth.RemoveRefreshToken(username, sessionKey)
 	w.WriteHeader(http.StatusNoContent)
 }
 

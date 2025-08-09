@@ -73,6 +73,9 @@ func RemoveRefreshToken(username string, key string) error {
 	defer mu.Unlock()
 	if userTokens, ok := tokenStore[username]; ok {
 		delete(userTokens, key)
+		if len(tokenStore[username]) == 0 {
+			delete(tokenStore, username)
+		}
 	}
 	err := saveRefreshTokens()
 	return err

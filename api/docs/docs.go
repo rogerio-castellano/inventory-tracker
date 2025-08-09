@@ -243,6 +243,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/users/{username}/tokens/{sessionKey}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Revoke a specific session for a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session key (IP+UA hash)",
+                        "name": "sessionKey",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Session revoked"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "User or session not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/login": {
             "post": {
                 "consumes": [
@@ -1207,6 +1259,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "issued_at": {
+                    "type": "string"
+                },
+                "session_key": {
                     "type": "string"
                 },
                 "user_agent": {

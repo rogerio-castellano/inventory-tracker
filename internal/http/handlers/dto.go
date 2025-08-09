@@ -80,11 +80,12 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-// RefreshTokenInfo contains metadata for auditing refresh tokens
+// RefreshTokenInfo contains session details for auditing and revocation
 type RefreshTokenInfo struct {
-	Username  string    `json:"username"`
-	IssuedAt  time.Time `json:"issued_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-	IPAddress string    `json:"ip_address"`
-	UserAgent string    `json:"user_agent"`
+	SessionKey string    `json:"session_key"`
+	Username   string    `json:"username"`
+	IssuedAt   time.Time `json:"issued_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	IPAddress  string    `json:"ip_address"`
+	UserAgent  string    `json:"user_agent"`
 }
