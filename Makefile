@@ -3,7 +3,7 @@ IMAGE_NAME = inventory-tracker
 PWD = $(shell pwd)
 
 .SHELL := bash
-.PHONY: help build-go test fast-test lint docs 
+.PHONY: help build-go test dev-test lint docs 
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk "BEGIN {FS = \":.*?## \"}; {printf \"%-20s %s\\n\", \$$1, \$$2}"
@@ -19,8 +19,8 @@ build-go:
 test: ## Run all tests
 	go test ./...
 
-t:fast-test
-fast-test: ## Run unit tests
+t:dev-test
+dev-test: ## Run unit tests
 	go test ./internal/tests/handlers_integrated_test_suite
 
 lint:
@@ -36,11 +36,11 @@ b:docker-build-dev
 docker-build-dev:
 	@start=$$(date +%s); \
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o inventory-api ./api/main.go; \
-	docker compose -f docker-compose.yml -f docker-compose-fast.yml build; \
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml build; \
 	end=$$(date +%s); \
 	echo "Build completed in $$((end - start))s (local + container)"
 	docker-compose down api
-	docker-compose -f docker-compose.yml -f docker-compose-fast.yml up -d api
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d api
 
 bd: build
 build: ## Build the application
