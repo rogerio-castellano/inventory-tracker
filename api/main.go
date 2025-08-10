@@ -10,7 +10,9 @@ import (
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/db"
 	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
+	ban "github.com/rogerio-castellano/inventory-tracker/internal/http/ban"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/redissvc"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
@@ -29,15 +31,17 @@ var ctx = context.Background()
 // @name Authorization
 func main() {
 	go auth.StartRefreshTokenCleaner(30 * time.Minute)
-	go api.StartDailyBanSummary(time.Hour * 24)
+	go ban.StartDailyBanSummary(time.Hour * 24)
 	go api.StartVisitorCleanupLoop()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatalf("Could not connect to Redis: %v", err)
 	}
 
-	authService := auth.NewAuthService(rdb, ctx)
-	handlers.SetAuthService(authService)
+	redisService := redissvc.NewRedisService(rdb, ctx)
+	handlers.SetRedisService(redisService)
+	ban.SetRedisService(redisService)
+	api.SetRedisService(redisService)
 
 	database, err := db.Connect()
 	if err != nil {
@@ -48,6 +52,7 @@ func main() {
 	handlers.SetMovementRepo(repo.NewPostgresMovementRepository(database))
 	handlers.SetUserRepo(repo.NewPostgresUserRepository(database))
 	handlers.SetMetricsRepo(repo.NewPostgresMetricsRepository(database))
+
 	r := api.NewRouter()
 	log.Println("✅ Server running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {

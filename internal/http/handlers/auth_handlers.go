@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/ban"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
 	"golang.org/x/crypto/bcrypt"
@@ -601,10 +602,7 @@ func AdminImpersonateUserHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {string} string "Redis error"
 // @Router /admin/bans [get]
 func ListActiveBansHandler(w http.ResponseWriter, r *http.Request) {
-	rdb := AuthSvc.Rdb()
-	ctx := AuthSvc.Ctx()
-
-	keys, err := rdb.Keys(ctx, "ratelimit:ban:*").Result()
+	keys, err := Rdb.Keys(Ctx, "ratelimit:ban:*").Result()
 	if err != nil {
 		http.Error(w, "Failed to read bans", http.StatusInternalServerError)
 		return
@@ -618,7 +616,7 @@ func ListActiveBansHandler(w http.ResponseWriter, r *http.Request) {
 
 	bans := []BanInfo{}
 	for _, key := range keys {
-		ttl, err := rdb.TTL(ctx, key).Result()
+		ttl, err := Rdb.TTL(Ctx, key).Result()
 		if err == nil && ttl > 0 {
 			id := strings.TrimPrefix(key, "ratelimit:ban:")
 			bans = append(bans, BanInfo{
@@ -645,10 +643,8 @@ func ListActiveBansHandler(w http.ResponseWriter, r *http.Request) {
 func UnbanHandler(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	key := fmt.Sprintf("ratelimit:ban:%s", id)
-	rdb := AuthSvc.Rdb()
-	ctx := AuthSvc.Ctx()
 
-	ok, err := rdb.Del(ctx, key).Result()
+	ok, err := Rdb.Del(Ctx, key).Result()
 	if err != nil {
 		http.Error(w, "Failed to delete ban", http.StatusInternalServerError)
 		return
@@ -659,6 +655,32 @@ func UnbanHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// @Summary Send today's ban summary immediately
+// @Tags admin
+// @Security BearerAuth
+// @Success 202 {string} string "Ban summary sent"
+// @Failure 404 {string} string "No bans logged today"
+// @Failure 500 {string} string "Redis error"
+// @Router /admin/bans/summary/send [post]
+func TriggerDailyBanSummaryHandler(w http.ResponseWriter, r *http.Request) {
+
+	entries, err := Rdb.LRange(Ctx, ban.DailyBanLogKey, 0, -1).Result()
+	if err != nil {
+		http.Error(w, "Error reading ban log", http.StatusInternalServerError)
+		return
+	}
+	if len(entries) == 0 {
+		http.Error(w, "No bans logged today", http.StatusNotFound)
+		return
+	}
+
+	// send summary immediately
+	ban.SendDailyBanSummary()
+
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte("📬 Ban summary sent."))
 }
 
 func sessionKey(ip, ua string) string {

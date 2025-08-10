@@ -48,6 +48,39 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/bans/summary/send": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Send today's ban summary immediately",
+                "responses": {
+                    "202": {
+                        "description": "Ban summary sent",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "No bans logged today",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Redis error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/bans/{id}": {
             "delete": {
                 "security": [

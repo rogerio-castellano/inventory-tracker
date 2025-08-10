@@ -193,6 +193,26 @@ paths:
       summary: Remove a ban for user or IP
       tags:
       - admin
+  /admin/bans/summary/send:
+    post:
+      responses:
+        "202":
+          description: Ban summary sent
+          schema:
+            type: string
+        "404":
+          description: No bans logged today
+          schema:
+            type: string
+        "500":
+          description: Redis error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Send today's ban summary immediately
+      tags:
+      - admin
   /admin/tokens:
     get:
       produces:

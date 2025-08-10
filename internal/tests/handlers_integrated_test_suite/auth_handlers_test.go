@@ -15,7 +15,7 @@ import (
 func runWithVisitorCleanup(t *testing.T, name string, testFunc func(t *testing.T)) {
 	t.Run(name, func(t *testing.T) {
 		api.CleanupAllVisitors()
-		handlers.AuthSvc.Rdb().FlushDB(handlers.AuthSvc.Ctx())
+		handlers.Rdb.FlushDB(handlers.Ctx)
 		testFunc(t)
 	})
 }

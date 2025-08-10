@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/db"
 	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
+	"github.com/rogerio-castellano/inventory-tracker/internal/redissvc"
 	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -50,8 +50,9 @@ func setupTestRepos(password string) {
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatalf("Could not connect to Redis: %v", err)
 	}
-	authService := auth.NewAuthService(rdb, ctx)
-	handlers.SetAuthService(authService)
+	redisService := redissvc.NewRedisService(rdb, ctx)
+	handlers.SetRedisService(redisService)
+	api.SetRedisService(redisService)
 
 	dbUrl := os.Getenv("DATABASE_URL")
 	if dbUrl == "" {

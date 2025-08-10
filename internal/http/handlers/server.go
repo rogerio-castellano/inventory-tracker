@@ -1,7 +1,10 @@
 package handlers
 
 import (
-	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
+	"context"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/rogerio-castellano/inventory-tracker/internal/redissvc"
 	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
@@ -10,7 +13,9 @@ var (
 	movementRepo repo.MovementRepository
 	metricsRepo  repo.MetricsRepository
 	userRepo     repo.UserRepository
-	AuthSvc      *auth.AuthService
+
+	Rdb *redis.Client
+	Ctx context.Context
 )
 
 func SetProductRepo(r repo.ProductRepository) {
@@ -29,6 +34,7 @@ func SetUserRepo(r repo.UserRepository) {
 	userRepo = r
 }
 
-func SetAuthService(a *auth.AuthService) {
-	AuthSvc = a
+func SetRedisService(rs *redissvc.RedisService) {
+	Rdb = rs.Rdb()
+	Ctx = rs.Ctx()
 }
