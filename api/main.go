@@ -29,6 +29,7 @@ var ctx = context.Background()
 // @name Authorization
 func main() {
 	go auth.StartRefreshTokenCleaner(30 * time.Minute)
+	go api.StartDailyBanSummary(time.Hour * 24)
 	go api.StartVisitorCleanupLoop()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
