@@ -254,11 +254,10 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	ua := r.UserAgent()
 	key := sessionKey(host, ua)
-	userSessions, ok, err := auth.GetRefreshToken(key)
+	userSessions, ok, err := auth.GetRefreshToken(req.Username)
 	if err != nil {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
-
 	}
 	if !ok {
 		http.Error(w, "No active sessions", http.StatusNotFound)

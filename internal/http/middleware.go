@@ -127,7 +127,10 @@ func RedisRateLimitMiddleware(route string, maxRequests int, window time.Duratio
 
 			// If over limit
 			if count > int64(maxRequests) {
-				recordRateLimitStrike(key)
+				if err := recordRateLimitStrike(key, r); err != nil {
+					http.Error(w, "Rate limit error", http.StatusInternalServerError)
+					return
+				}
 				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(ttl.Seconds())))
 				http.Error(w, "Too many requests", http.StatusTooManyRequests)
 				return
@@ -138,8 +141,11 @@ func RedisRateLimitMiddleware(route string, maxRequests int, window time.Duratio
 	}
 }
 
-const rateLimitStrikeThreshold = 5
-const rateLimitStrikeWindow = 10 * time.Minute
+const (
+	rateLimitStrikeThreshold = 10
+	rateLimitStrikeWindow    = 10 * time.Minute
+	banDuration              = 15 * time.Minute
+)
 
 func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -150,6 +156,7 @@ func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 				_, claims, err := auth.TokenClaims(authorization)
 				if err != nil {
 					http.Error(w, "Rate limit error", http.StatusInternalServerError)
+					return
 				}
 				if rRole, ok := claims["role"].(string); ok {
 					role = rRole
@@ -163,9 +170,20 @@ func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 				http.Error(w, "Rate limit error", http.StatusInternalServerError)
 				return
 			}
-			key = fmt.Sprintf("ratelimit:%s:%s:%s", route, role, key)
+			redisKey := fmt.Sprintf("ratelimit:%s:%s:%s", route, role, key)
 
-			count, ttl, err := incrementWithTTL(key, cfg.Window)
+			rdb := handlers.AuthSvc.Rdb()
+			ctx := handlers.AuthSvc.Ctx()
+			banKey := fmt.Sprintf("ratelimit:ban:%s", key)
+			banTTL, err := rdb.TTL(ctx, banKey).Result()
+
+			if err == nil && banTTL > 0 {
+				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(banTTL.Seconds())))
+				http.Error(w, "Too many requests — temporarily banned", http.StatusTooManyRequests)
+				return
+			}
+
+			count, ttl, err := incrementWithTTL(redisKey, cfg.Window)
 			if err != nil {
 				http.Error(w, "Rate limit error", http.StatusInternalServerError)
 				return
@@ -179,7 +197,11 @@ func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", int(ttl.Seconds())))
 
 			if count > int64(cfg.MaxRequests) {
-				recordRateLimitStrike(key)
+				if err := recordRateLimitStrike(redisKey, r); err != nil {
+					http.Error(w, "Rate limit error", http.StatusInternalServerError)
+					return
+				}
+
 				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(ttl.Seconds())))
 				http.Error(w, "Too many requests", http.StatusTooManyRequests)
 				return
@@ -190,19 +212,27 @@ func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 	}
 }
 
-func recordRateLimitStrike(key string) {
-	strikeKey := fmt.Sprintf("ratelimit:strikes:%s", key)
+func recordRateLimitStrike(key string, r *http.Request) error {
 	rdb := handlers.AuthSvc.Rdb()
 	ctx := handlers.AuthSvc.Ctx()
 
-	// Increment strike counter
+	strikeKey := fmt.Sprintf("ratelimit:strikes:%s", key)
 	strikes, err := rdb.Incr(ctx, strikeKey).Result()
 	if err == nil {
 		rdb.Expire(ctx, strikeKey, rateLimitStrikeWindow)
+
 		if strikes >= int64(rateLimitStrikeThreshold) {
-			log.Printf("⚠️ RATE LIMIT ABUSE: key=%s (%d strikes in %v)", key, strikes, rateLimitStrikeWindow)
+			key, err := getClientIdentifier(r)
+			if err != nil {
+				return err
+			}
+
+			banKey := fmt.Sprintf("ratelimit:ban:%s", key)
+			_ = rdb.Set(ctx, banKey, "1", banDuration).Err()
+			log.Printf("🚫 BANNED: %s for %v due to %d+ strikes", banKey, banDuration, strikes)
 		}
 	}
+	return nil
 }
 
 func getRateLimitKey(r *http.Request, route string) (string, error) {
