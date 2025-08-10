@@ -41,6 +41,7 @@ docker-build-dev:
 	echo "Build completed in $$((end - start))s (local + container)"
 	docker-compose down api
 	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d api
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d mailhog
 
 bd: build
 build: ## Build the application

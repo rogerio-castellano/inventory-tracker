@@ -28,6 +28,12 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://postgres:example@db:5432/inventory?sslmode=disable
+      ALERT_FROM:
+      ALERT_TO:
+      SMTP_SERVER:
+      SMTP_PORT:
+      SMTP_USER:
+      SMTP_PASS:
 
   redis:
     image: redis:7.2-alpine

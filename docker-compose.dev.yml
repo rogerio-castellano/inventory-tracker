@@ -11,11 +11,20 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://postgres:example@db:5432/inventory?sslmode=disable
+      ALERT_FROM: james.smith@smith.com
+      ALERT_TO: john.johnson@johnson.com
+      SMTP_SERVER: mailhog
+      SMTP_PORT: 1025
+      SMTP_USER: test
+      SMTP_PASS: test
+      SMTP_AUTH_DISABLED: yes
 
   mailhog:
     image: mailhog/mailhog
-    container_name: mailhog
-    restart: always
+    container_name: mailhog-dev
+    ports:
+      - "1025:1025"
+      - "8025:8025"
     environment:
       MH_AUTH_FILE: /mailhog.auth
       MH_MAILDIR_PATH: /data
@@ -23,9 +32,5 @@ services:
     volumes:
       - ./mailhog.auth:/mailhog.auth:ro
       - ./data:/data:rw
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-
 volumes:
   pgdata:

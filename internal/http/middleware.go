@@ -6,6 +6,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/smtp"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -127,7 +129,7 @@ func RedisRateLimitMiddleware(route string, maxRequests int, window time.Duratio
 
 			// If over limit
 			if count > int64(maxRequests) {
-				if err := recordRateLimitStrike(key, r); err != nil {
+				if err := recordRateLimitStrike(key, route, r); err != nil {
 					http.Error(w, "Rate limit error", http.StatusInternalServerError)
 					return
 				}
@@ -197,7 +199,7 @@ func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", int(ttl.Seconds())))
 
 			if count > int64(cfg.MaxRequests) {
-				if err := recordRateLimitStrike(redisKey, r); err != nil {
+				if err := recordRateLimitStrike(redisKey, route, r); err != nil {
 					http.Error(w, "Rate limit error", http.StatusInternalServerError)
 					return
 				}
@@ -212,7 +214,7 @@ func RedisRateLimitPerRole(route string) func(http.Handler) http.Handler {
 	}
 }
 
-func recordRateLimitStrike(key string, r *http.Request) error {
+func recordRateLimitStrike(key, route string, r *http.Request) error {
 	rdb := handlers.AuthSvc.Rdb()
 	ctx := handlers.AuthSvc.Ctx()
 
@@ -230,6 +232,7 @@ func recordRateLimitStrike(key string, r *http.Request) error {
 			banKey := fmt.Sprintf("ratelimit:ban:%s", key)
 			_ = rdb.Set(ctx, banKey, "1", banDuration).Err()
 			log.Printf("🚫 BANNED: %s for %v due to %d+ strikes", banKey, banDuration, strikes)
+			sendBanAlertEmail(key, route, int(strikes)) // 📨 trigger alert
 		}
 	}
 	return nil
@@ -313,4 +316,35 @@ func incrementWithTTL(key string, window time.Duration) (int64, time.Duration, e
 	}
 
 	return countCmd.Val(), ttl, nil
+}
+
+var (
+	alertFrom        = os.Getenv("ALERT_FROM")  // sender email
+	alertTo          = os.Getenv("ALERT_TO")    // receiver email
+	smtpServer       = os.Getenv("SMTP_SERVER") // smtp.example.com
+	smtpPort         = os.Getenv("SMTP_PORT")   // e.g., 587
+	smtpUser         = os.Getenv("SMTP_USER")
+	smtpPassword     = os.Getenv("SMTP_PASS")
+	smtpAuthDisabled = os.Getenv("SMTP_AUTH_DISABLED")
+)
+
+func sendBanAlertEmail(bannedID string, route string, strikes int) {
+	subject := fmt.Sprintf("⚠️ BAN ALERT: %s blocked", bannedID)
+	body := fmt.Sprintf("Target: %s\nRoute: %s\nStrikes: %d\nTime: %s", bannedID, route, strikes, time.Now().Format(time.RFC3339))
+
+	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s", alertFrom, alertTo, subject, body)
+
+	addr := fmt.Sprintf("%s:%s", smtpServer, smtpPort)
+	auth := smtp.PlainAuth("", smtpUser, smtpPassword, smtpServer)
+
+	if smtpAuthDisabled != "" {
+		auth = nil
+	}
+
+	go func() {
+		err := smtp.SendMail(addr, auth, alertFrom, []string{alertTo}, []byte(msg))
+		if err != nil {
+			fmt.Printf("Failed to send alert email: %v\n", err)
+		}
+	}()
 }
