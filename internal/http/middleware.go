@@ -403,29 +403,58 @@ func sendDailyBanSummary() {
 	if err != nil || len(entries) == 0 {
 		return
 	}
-	_ = rdb.Del(ctx, dailyBanLogKey).Err()
+	_ = rdb.Del(ctx, dailyBanLogKey).Err() // clear after reading
 
-	body := "<h2>📊 Daily Ban Summary</h2><ul>"
+	// parse logs and aggregate
+	var logs []BanLogEntry
+	routeCounts := make(map[string]int)
+	targetCounts := make(map[string]int)
+
 	for _, item := range entries {
 		var entry BanLogEntry
-		_ = json.Unmarshal([]byte(item), &entry)
-		body += fmt.Sprintf("<li><b>%s</b> on route <code>%s</code> (%d strikes) at %s</li>",
-			entry.Target, entry.Route, entry.Strikes, entry.Time.Format(time.RFC822))
+		if err := json.Unmarshal([]byte(item), &entry); err == nil {
+			logs = append(logs, entry)
+			routeCounts[entry.Route]++
+			targetCounts[entry.Target]++
+		}
 	}
-	body += "</ul>"
 
-	from := os.Getenv("ALERT_FROM")
-	to := os.Getenv("ALERT_TO")
+	// compose HTML
+	var sb strings.Builder
+	sb.WriteString("<h2>📊 Daily Ban Summary</h2>")
+	sb.WriteString(fmt.Sprintf("<p>Total bans: <strong>%d</strong></p>", len(logs)))
+
+	// 🔢 Summary by route
+	sb.WriteString("<h3>🚪 By Route</h3><ul>")
+	for route, count := range routeCounts {
+		sb.WriteString(fmt.Sprintf("<li><code>%s</code>: %d</li>", route, count))
+	}
+	sb.WriteString("</ul>")
+
+	// 👤 Summary by user/IP
+	sb.WriteString("<h3>👤 By User/IP</h3><ul>")
+	for target, count := range targetCounts {
+		sb.WriteString(fmt.Sprintf("<li>%s: %d</li>", target, count))
+	}
+	sb.WriteString("</ul>")
+
+	// 📜 Full list
+	sb.WriteString("<h3>📋 Full Log</h3><ul>")
+	for _, entry := range logs {
+		sb.WriteString(fmt.Sprintf("<li><b>%s</b> on <code>%s</code> (%d strikes) at %s</li>",
+			entry.Target, entry.Route, entry.Strikes, entry.Time.Format(time.RFC822)))
+	}
+	sb.WriteString("</ul>")
 	subject := "📊 Daily Ban Report"
 
 	msg := strings.Join([]string{
-		"From: " + from,
-		"To: " + to,
+		"From: " + alertFrom,
+		"To: " + alertTo,
 		"Subject: " + subject,
 		"MIME-Version: 1.0",
 		"Content-Type: text/html; charset=\"UTF-8\"",
 		"",
-		body,
+		sb.String(),
 	}, "\r\n")
 
 	addr := fmt.Sprintf("%s:%s", smtpServer, smtpPort)
@@ -436,7 +465,7 @@ func sendDailyBanSummary() {
 	}
 
 	go func() {
-		err = smtp.SendMail(addr, auth, alertFrom, []string{to}, []byte(msg))
+		err = smtp.SendMail(addr, auth, alertFrom, []string{alertTo}, []byte(msg))
 		if err != nil {
 			log.Printf("❌ Failed to send email: %v\n", err)
 		} else {
