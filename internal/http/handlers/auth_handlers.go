@@ -680,7 +680,9 @@ func TriggerDailyBanSummaryHandler(w http.ResponseWriter, r *http.Request) {
 	ban.SendDailyBanSummary()
 
 	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("📬 Ban summary sent."))
+	if _, err := w.Write([]byte("📬 Ban summary sent.")); err != nil {
+		log.Println("[DailyBanSummary] Error sending confirmation response")
+	}
 }
 
 func sessionKey(ip, ua string) string {
