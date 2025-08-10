@@ -31,6 +31,6 @@ services:
       MH_STORAGE: maildir
     volumes:
       - ./mailhog.auth:/mailhog.auth:ro
-      - ./data:/data:rw
+      - ./mailhogdata:/data:rw
 volumes:
   pgdata:
