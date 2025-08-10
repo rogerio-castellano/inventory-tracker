@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -590,6 +591,74 @@ func AdminImpersonateUserHandler(w http.ResponseWriter, r *http.Request) {
 	if err := writeJSON(w, http.StatusOK, LoginResult{AccessToken: accessToken, RefreshToken: refreshToken}); err != nil {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
+}
+
+// @Summary List all currently banned users or IPs
+// @Tags admin
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {array} object
+// @Failure 500 {string} string "Redis error"
+// @Router /admin/bans [get]
+func ListActiveBansHandler(w http.ResponseWriter, r *http.Request) {
+	rdb := AuthSvc.Rdb()
+	ctx := AuthSvc.Ctx()
+
+	keys, err := rdb.Keys(ctx, "ratelimit:ban:*").Result()
+	if err != nil {
+		http.Error(w, "Failed to read bans", http.StatusInternalServerError)
+		return
+	}
+
+	type BanInfo struct {
+		ID        string        `json:"id"`
+		TTL       time.Duration `json:"ttl"`
+		ExpiresAt time.Time     `json:"expires_at"`
+	}
+
+	bans := []BanInfo{}
+	for _, key := range keys {
+		ttl, err := rdb.TTL(ctx, key).Result()
+		if err == nil && ttl > 0 {
+			id := strings.TrimPrefix(key, "ratelimit:ban:")
+			bans = append(bans, BanInfo{
+				ID:        id,
+				TTL:       ttl,
+				ExpiresAt: time.Now().Add(ttl),
+			})
+		}
+	}
+
+	if err := writeJSON(w, http.StatusOK, bans); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
+}
+
+// @Summary Remove a ban for user or IP
+// @Tags admin
+// @Security BearerAuth
+// @Param id path string true "User or IP to unban"
+// @Success 204 "Ban removed"
+// @Failure 404 {string} string "Not found"
+// @Failure 500 {string} string "Redis error"
+// @Router /admin/bans/{id} [delete]
+func UnbanHandler(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	key := fmt.Sprintf("ratelimit:ban:%s", id)
+	rdb := AuthSvc.Rdb()
+	ctx := AuthSvc.Ctx()
+
+	ok, err := rdb.Del(ctx, key).Result()
+	if err != nil {
+		http.Error(w, "Failed to delete ban", http.StatusInternalServerError)
+		return
+	}
+	if ok == 0 {
+		http.Error(w, "Ban not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func sessionKey(ip, ua string) string {

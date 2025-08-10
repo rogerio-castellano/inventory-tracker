@@ -101,6 +101,14 @@ POST {{url}}/admin/users/joseph/tokens HTTP/1.1
 Authorization: Bearer {{token}}
 
 ###
+GET {{url}}/admin/bans HTTP/1.1
+Authorization: Bearer {{token}}
+
+###
+DELETE {{url}}/admin/bans/admin HTTP/1.1
+Authorization: Bearer {{token}}
+
+###
 # Login with valid credentials (keep it after business endpoints)
 # @name login
 POST {{url}}/login HTTP/1.1

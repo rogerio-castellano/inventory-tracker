@@ -149,6 +149,50 @@ info:
   title: Inventory Tracker API
   version: "1.0"
 paths:
+  /admin/bans:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: object
+            type: array
+        "500":
+          description: Redis error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List all currently banned users or IPs
+      tags:
+      - admin
+  /admin/bans/{id}:
+    delete:
+      parameters:
+      - description: User or IP to unban
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Ban removed
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Redis error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Remove a ban for user or IP
+      tags:
+      - admin
   /admin/tokens:
     get:
       produces:

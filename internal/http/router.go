@@ -53,6 +53,8 @@ func NewRouter() http.Handler {
 		r.Delete("/users/{username}/tokens", handlers.RevokeAllUserSessionsHandler)
 		r.Delete("/users/{username}/tokens/{sessionKey}", handlers.RevokeUserSessionHandler)
 		r.With(RedisRateLimitPerRole("admin-impersonate")).Post("/users/{username}/tokens", handlers.AdminImpersonateUserHandler)
+		r.Get("/bans", handlers.ListActiveBansHandler)
+		r.Delete("/bans/{id}", handlers.UnbanHandler)
 	})
 
 	r.Get("/swagger/*", httpSwagger.Handler(
