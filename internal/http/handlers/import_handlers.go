@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	models "github.com/rogerio-castellano/inventory-tracker/internal/models"
+	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 )
 
 type csvRow struct {

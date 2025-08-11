@@ -8,20 +8,21 @@ import (
 	"strings"
 	"testing"
 
-	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	rl "github.com/rogerio-castellano/inventory-tracker/internal/http/rate_limiter"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/router"
 )
 
 func runWithVisitorCleanup(t *testing.T, name string, testFunc func(t *testing.T)) {
 	t.Run(name, func(t *testing.T) {
-		api.CleanupAllVisitors()
+		rl.CleanupAllVisitors()
 		handlers.Rdb.FlushDB(handlers.Ctx)
 		testFunc(t)
 	})
 }
 
 func TestAuthFlow(t *testing.T) {
-	r := api.NewRouter()
+	r := router.NewRouter()
 
 	runWithVisitorCleanup(t, "Login with valid credentials", func(t *testing.T) {
 		payload := handlers.CredentialsRequest{Username: "admin", Password: "secret"}
@@ -87,7 +88,7 @@ func TestAuthFlow(t *testing.T) {
 }
 
 func TestRegisterHandler(t *testing.T) {
-	r := api.NewRouter()
+	r := router.NewRouter()
 
 	runWithVisitorCleanup(t, "Valid registration returns token", func(t *testing.T) {
 		t.Cleanup(clearAllUsersExceptAdmin)

@@ -1,4 +1,4 @@
-package http
+package rate_limiter
 
 import (
 	"sync"
@@ -17,7 +17,7 @@ var (
 	mu       sync.Mutex
 )
 
-func getVisitor(ip string) *rate.Limiter {
+func GetVisitor(ip string) *rate.Limiter {
 	mu.Lock()
 	defer mu.Unlock()
 

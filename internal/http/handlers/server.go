@@ -5,7 +5,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/rogerio-castellano/inventory-tracker/internal/redissvc"
-	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
+	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
 var (

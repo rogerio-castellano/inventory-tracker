@@ -1,4 +1,4 @@
-package http
+package middleware
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/ban"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	rl "github.com/rogerio-castellano/inventory-tracker/internal/http/rate_limiter"
 	"github.com/rogerio-castellano/inventory-tracker/internal/redissvc"
 )
 
@@ -93,7 +94,7 @@ func RateLimitMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		limiter := getVisitor(host)
+		limiter := rl.GetVisitor(host)
 		if !limiter.Allow() {
 			http.Error(w, "Too many requests", http.StatusTooManyRequests)
 			return

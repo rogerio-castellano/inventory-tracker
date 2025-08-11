@@ -9,11 +9,13 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rogerio-castellano/inventory-tracker/internal/auth"
 	"github.com/rogerio-castellano/inventory-tracker/internal/db"
-	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
-	ban "github.com/rogerio-castellano/inventory-tracker/internal/http/ban"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/ban"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	mw "github.com/rogerio-castellano/inventory-tracker/internal/http/middleware"
+	rl "github.com/rogerio-castellano/inventory-tracker/internal/http/rate_limiter"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/router"
 	"github.com/rogerio-castellano/inventory-tracker/internal/redissvc"
-	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
+	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
 var rdb = redis.NewClient(&redis.Options{
@@ -32,7 +34,7 @@ var ctx = context.Background()
 func main() {
 	go auth.StartRefreshTokenCleaner(30 * time.Minute)
 	go ban.StartDailyBanSummary(time.Hour * 24)
-	go api.StartVisitorCleanupLoop()
+	go rl.StartVisitorCleanupLoop()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatalf("Could not connect to Redis: %v", err)
@@ -42,7 +44,7 @@ func main() {
 	redisService := redissvc.NewRedisService(rdb, ctx)
 	handlers.SetRedisService(redisService)
 	ban.SetRedisService(redisService)
-	api.SetRedisService(redisService)
+	mw.SetRedisService(redisService)
 
 	database, err := db.Connect()
 	if err != nil {
@@ -55,7 +57,7 @@ func main() {
 	handlers.SetUserRepo(repo.NewPostgresUserRepository(database))
 	handlers.SetMetricsRepo(repo.NewPostgresMetricsRepository(database))
 
-	r := api.NewRouter()
+	r := router.NewRouter()
 	log.Println("✅ Server running on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)

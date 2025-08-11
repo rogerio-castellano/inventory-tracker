@@ -6,17 +6,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
-	handler "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/router"
 	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
 func TestDashboardMetricsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
 	// Create 3 products (2 below threshold)
-	products := []handler.ProductRequest{
+	products := []handlers.ProductRequest{
 		{Name: "Keyboard", Price: 40.0, Quantity: 10, Threshold: 5},
 		{Name: "Mouse", Price: 20.0, Quantity: 1, Threshold: 5},    // below threshold
 		{Name: "Monitor", Price: 150.0, Quantity: 2, Threshold: 3}, // below threshold
@@ -28,7 +28,7 @@ func TestDashboardMetricsHandler(t *testing.T) {
 			t.Fatalf("product creation failed: %d", w.Code)
 		}
 		if p.Name == "Mouse" {
-			var resp handler.ProductResponse
+			var resp handlers.ProductResponse
 			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 				t.Fatalf("failed to decode response: %v", err)
 			}
@@ -38,7 +38,7 @@ func TestDashboardMetricsHandler(t *testing.T) {
 
 	// Add 3 movements for Mouse
 	for range 3 {
-		adj := handler.QuantityAdjustmentRequest{Delta: 1}
+		adj := handlers.QuantityAdjustmentRequest{Delta: 1}
 		w := adjustProduct(r, mouseID, adj)
 
 		if w.Code != http.StatusOK {
@@ -81,9 +81,9 @@ func TestDashboardMetricsHandler(t *testing.T) {
 
 func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	products := []handler.ProductRequest{
+	products := []handlers.ProductRequest{
 		{Name: "Keyboard", Price: 50.0, Quantity: 5, Threshold: 2},
 		{Name: "Mouse", Price: 25.0, Quantity: 2, Threshold: 3},    // low stock
 		{Name: "Monitor", Price: 200.0, Quantity: 1, Threshold: 2}, // low stock
@@ -95,7 +95,7 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 			t.Fatalf("failed to create product: %d", w.Code)
 		}
 		if p.Name == "Mouse" {
-			var resp handler.ProductResponse
+			var resp handlers.ProductResponse
 			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 				t.Fatalf("failed to decode response: %v", err)
 			}
@@ -105,7 +105,7 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 
 	// Add 5 movements for Mouse
 	for range 5 {
-		adj := handler.QuantityAdjustmentRequest{Delta: 1}
+		adj := handlers.QuantityAdjustmentRequest{Delta: 1}
 		adjustProduct(r, mouseID, adj)
 	}
 
@@ -169,7 +169,7 @@ func TestDashboardMetricsHandler_Enhanced(t *testing.T) {
 }
 
 func TestForbiddenAccessToNonAdminUser(t *testing.T) {
-	r := api.NewRouter()
+	r := router.NewRouter()
 	userToken, err := userRoleToken(r)
 	if err != nil {
 		t.Fatalf("Error getting user token")

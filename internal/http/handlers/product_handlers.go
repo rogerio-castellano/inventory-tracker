@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	models "github.com/rogerio-castellano/inventory-tracker/internal/models"
-	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
+	"github.com/rogerio-castellano/inventory-tracker/internal/models"
+	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
 // CreateProductHandler godoc

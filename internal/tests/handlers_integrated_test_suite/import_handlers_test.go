@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
-	handler "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/router"
 )
 
 func TestImportProductsHandler(t *testing.T) {
-	r := api.NewRouter()
+	r := router.NewRouter()
 
 	t.Run("File with unique valid products", func(t *testing.T) {
 		t.Cleanup(clearAllProducts)
@@ -45,7 +45,7 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.ImportProductsResult
+		var resp handlers.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -87,7 +87,7 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.ImportProductsResult
+		var resp handlers.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -135,7 +135,7 @@ Keyboard,45.00,5,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.ImportProductsResult
+		var resp handlers.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -157,7 +157,7 @@ Keyboard,45.00,5,1`
 	t.Run("Import with update mode replaces product", func(t *testing.T) {
 		t.Cleanup(clearAllProducts)
 		// Create a product to update
-		original := handler.ProductRequest{Name: "Monitor", Price: 200.0, Quantity: 5, Threshold: 2}
+		original := handlers.ProductRequest{Name: "Monitor", Price: 200.0, Quantity: 5, Threshold: 2}
 		createProduct(r, original)
 
 		// Import CSV with same product name but new values
@@ -185,7 +185,7 @@ Monitor,99.0,1,1`
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.ImportProductsResult
+		var resp handlers.ImportProductsResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding body: %v", err)
 		}
@@ -199,7 +199,7 @@ Monitor,99.0,1,1`
 		getW := httptest.NewRecorder()
 		r.ServeHTTP(getW, get)
 
-		var all []handler.ProductResponse
+		var all []handlers.ProductResponse
 		if err := json.NewDecoder(getW.Body).Decode(&all); err != nil {
 			t.Fatalf("error decoding body: %v", err)
 		}
@@ -215,7 +215,7 @@ Monitor,99.0,1,1`
 }
 
 func TestImportProductsHandler_InvalidFields(t *testing.T) {
-	r := api.NewRouter()
+	r := router.NewRouter()
 
 	tests := []struct {
 		name           string
@@ -269,7 +269,7 @@ Keyboard,45.00,5,1
 				t.Fatalf("expected 200 OK, got %d", w.Code)
 			}
 
-			var resp handler.ImportProductsResult
+			var resp handlers.ImportProductsResult
 			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 				t.Fatalf("failed to decode response: %v", err)
 			}

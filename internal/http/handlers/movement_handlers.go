@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	repo "github.com/rogerio-castellano/inventory-tracker/internal/repo"
+	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
 )
 
 // AdjustQuantityHandler godoc

@@ -12,33 +12,33 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
-	handler "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/router"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 )
 
 func TestAdjustQuantityHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
 
-	r := api.NewRouter()
-	product := handler.ProductRequest{Name: "InventoryItem", Price: 10.0, Quantity: 10}
+	r := router.NewRouter()
+	product := handlers.ProductRequest{Name: "InventoryItem", Price: 10.0, Quantity: 10}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created handler.ProductRequest
+	var created handlers.ProductRequest
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
 	t.Run("Increase quantity", func(t *testing.T) {
-		adj := handler.QuantityAdjustmentRequest{Delta: 5}
+		adj := handlers.QuantityAdjustmentRequest{Delta: 5}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp handler.ProductResponse
+		var resp handlers.ProductResponse
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -48,13 +48,13 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Decrease quantity", func(t *testing.T) {
-		adj := handler.QuantityAdjustmentRequest{Delta: -3}
+		adj := handlers.QuantityAdjustmentRequest{Delta: -3}
 		w := adjustProduct(r, created.Id, adj)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.ProductResponse
+		var resp handlers.ProductResponse
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -64,7 +64,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Too much decrease (underflow)", func(t *testing.T) {
-		adj := handler.QuantityAdjustmentRequest{Delta: -100}
+		adj := handlers.QuantityAdjustmentRequest{Delta: -100}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusConflict {
@@ -73,7 +73,7 @@ func TestAdjustQuantityHandler(t *testing.T) {
 	})
 
 	t.Run("Invalid ID", func(t *testing.T) {
-		adj := handler.QuantityAdjustmentRequest{Delta: 1}
+		adj := handlers.QuantityAdjustmentRequest{Delta: 1}
 		body, _ := json.Marshal(adj)
 		req := httptest.NewRequest(http.MethodPost, "/products/abc/adjust", bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -99,21 +99,21 @@ func TestAdjustQuantityHandler(t *testing.T) {
 
 func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	product := handler.ProductRequest{Name: "ConcurrentItem", Price: 10.0, Quantity: 5}
+	product := handlers.ProductRequest{Name: "ConcurrentItem", Price: 10.0, Quantity: 5}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created handler.ProductResponse
+	var created handlers.ProductResponse
 
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 	// ❌ Try deducting more than available
 	t.Run("Reject over-deduction", func(t *testing.T) {
-		adj := handler.QuantityAdjustmentRequest{Delta: -10}
+		adj := handlers.QuantityAdjustmentRequest{Delta: -10}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusConflict {
@@ -135,7 +135,7 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 				if i%2 == 0 {
 					delta = +1
 				}
-				adj := handler.QuantityAdjustmentRequest{Delta: delta}
+				adj := handlers.QuantityAdjustmentRequest{Delta: delta}
 				w := adjustProduct(r, created.Id, adj)
 
 				if w.Code == http.StatusOK {
@@ -148,7 +148,7 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 		getReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/products/%d", created.Id), nil)
 		getW := httptest.NewRecorder()
 		r.ServeHTTP(getW, getReq)
-		var final handler.ProductResponse
+		var final handlers.ProductResponse
 
 		if err := json.NewDecoder(getW.Body).Decode(&final); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
@@ -161,21 +161,21 @@ func TestAdjustQuantityHandler_AtomicAndConcurrent(t *testing.T) {
 
 func TestGetMovementsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	product := handler.ProductRequest{Name: "Box", Price: 50.0, Quantity: 10}
+	product := handlers.ProductRequest{Name: "Box", Price: 50.0, Quantity: 10}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created handler.ProductResponse
+	var created handlers.ProductResponse
 
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 	// Adjust quantity twice to generate movement log
 	adjust := func(delta int) {
-		adj := handler.QuantityAdjustmentRequest{Delta: delta}
+		adj := handlers.QuantityAdjustmentRequest{Delta: delta}
 		w := adjustProduct(r, created.Id, adj)
 		if w.Code != http.StatusOK {
 			t.Fatalf("failed to adjust quantity: delta %d", delta)
@@ -193,7 +193,7 @@ func TestGetMovementsHandler(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var movementsCollection handler.MovementsSearchResult
+		var movementsCollection handlers.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -221,7 +221,7 @@ func TestGetMovementsHandler(t *testing.T) {
 			t.Errorf("expected 400 Not Found, got %d", w.Code)
 		}
 
-		var movements handler.MovementsSearchResult
+		var movements handlers.MovementsSearchResult
 		var data, err = io.ReadAll(w.Body)
 		if err != nil {
 			t.Fatalf("error reading request body: %v", err)
@@ -239,14 +239,14 @@ func TestGetMovementsHandler(t *testing.T) {
 
 func TestGetMovementsHandler_Filtering(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	product := handler.ProductRequest{Name: "FilterBox", Price: 80.0, Quantity: 10}
+	product := handlers.ProductRequest{Name: "FilterBox", Price: 80.0, Quantity: 10}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created handler.ProductResponse
+	var created handlers.ProductResponse
 
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
@@ -259,7 +259,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 	})
 	// movement :=
 	// Second adjustment: recent
-	adj := handler.QuantityAdjustmentRequest{Delta: 2}
+	adj := handlers.QuantityAdjustmentRequest{Delta: 2}
 	w2 := adjustProduct(r, created.Id, adj)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("failed to adjust product")
@@ -271,7 +271,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection handler.MovementsSearchResult
+		var movementsCollection handlers.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -286,7 +286,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection handler.MovementsSearchResult
+		var movementsCollection handlers.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -303,7 +303,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection handler.MovementsSearchResult
+		var movementsCollection handlers.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -319,7 +319,7 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		var movementsCollection handler.MovementsSearchResult
+		var movementsCollection handlers.MovementsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&movementsCollection); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -331,14 +331,14 @@ func TestGetMovementsHandler_Filtering(t *testing.T) {
 
 func TestGetMovementsHandler_Pagination(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	product := handler.ProductRequest{Name: "PagedWidget", Price: 20.0, Quantity: 5}
+	product := handlers.ProductRequest{Name: "PagedWidget", Price: 20.0, Quantity: 5}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created handler.ProductResponse
+	var created handlers.ProductResponse
 
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
@@ -346,7 +346,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 	// Generate 3 movements
 	deltas := []int{+1, -1, +2}
 	for _, d := range deltas {
-		adj := handler.QuantityAdjustmentRequest{Delta: d}
+		adj := handlers.QuantityAdjustmentRequest{Delta: d}
 		w := adjustProduct(r, created.Id, adj)
 		if w.Code != http.StatusOK {
 			t.Fatalf("failed to adjust delta %d", d)
@@ -362,7 +362,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.MovementsSearchResult
+		var resp handlers.MovementsSearchResult
 
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
@@ -385,7 +385,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.MovementsSearchResult
+		var resp handlers.MovementsSearchResult
 
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
@@ -404,7 +404,7 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.MovementsSearchResult
+		var resp handlers.MovementsSearchResult
 
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
@@ -418,9 +418,9 @@ func TestGetMovementsHandler_Pagination(t *testing.T) {
 
 func TestLowStockAlert(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	product := handler.ProductRequest{
+	product := handlers.ProductRequest{
 		Name:      "AlertItem",
 		Price:     50.0,
 		Quantity:  5,
@@ -430,14 +430,14 @@ func TestLowStockAlert(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product: %d", w.Code)
 	}
-	var created handler.ProductResponse
+	var created handlers.ProductResponse
 
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 	// Adjust to just above threshold (5 → 4) → no alert
 	t.Run("No alert above threshold", func(t *testing.T) {
-		adj := handler.QuantityAdjustmentRequest{Delta: -1}
+		adj := handlers.QuantityAdjustmentRequest{Delta: -1}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusOK {
@@ -457,14 +457,14 @@ func TestLowStockAlert(t *testing.T) {
 
 	// Adjust to below threshold (4 → 2) → should trigger alert
 	t.Run("Alert triggered below threshold", func(t *testing.T) {
-		adj := handler.QuantityAdjustmentRequest{Delta: -2}
+		adj := handlers.QuantityAdjustmentRequest{Delta: -2}
 		w := adjustProduct(r, created.Id, adj)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp handler.ProductResponse
+		var resp handlers.ProductResponse
 
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
@@ -477,19 +477,19 @@ func TestLowStockAlert(t *testing.T) {
 
 func TestExportMovementsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	product := handler.ProductRequest{Name: "Exportable", Price: 100.0, Quantity: 5}
+	product := handlers.ProductRequest{Name: "Exportable", Price: 100.0, Quantity: 5}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created handler.ProductResponse
+	var created handlers.ProductResponse
 
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	adj := handler.QuantityAdjustmentRequest{Delta: 3}
+	adj := handlers.QuantityAdjustmentRequest{Delta: 3}
 	w2 := adjustProduct(r, created.Id, adj)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("failed to adjust product")
@@ -544,14 +544,14 @@ func TestExportMovementsHandler(t *testing.T) {
 
 func TestExportMovementsHandler_Filtered(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	product := handler.ProductRequest{Name: "FilteredExport", Price: 75.0, Quantity: 8}
+	product := handlers.ProductRequest{Name: "FilteredExport", Price: 75.0, Quantity: 8}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("failed to create product")
 	}
-	var created handler.ProductResponse
+	var created handlers.ProductResponse
 
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
@@ -563,7 +563,7 @@ func TestExportMovementsHandler_Filtered(t *testing.T) {
 		CreatedAt: time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339),
 	})
 	// Insert one recent movement via API
-	adj := handler.QuantityAdjustmentRequest{Delta: 2}
+	adj := handlers.QuantityAdjustmentRequest{Delta: 2}
 	w2 := adjustProduct(r, created.Id, adj)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("failed to add recent movement")

@@ -9,21 +9,21 @@ import (
 	"strings"
 	"testing"
 
-	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
-	handler "github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/router"
 )
 
 func TestCreateProductHandler_Valid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	w := createProduct(r, handler.ProductRequest{Name: "Laptop", Price: 1500.0, Quantity: 1})
+	w := createProduct(r, handlers.ProductRequest{Name: "Laptop", Price: 1500.0, Quantity: 1})
 
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created, got %d", w.Code)
 	}
 
-	var resp handler.ProductResponse
+	var resp handlers.ProductResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
@@ -41,35 +41,35 @@ func TestCreateProductHandler_Valid(t *testing.T) {
 
 func TestCreateProductHandler_Invalid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
 	tests := []struct {
 		name           string
-		payload        handler.ProductRequest
+		payload        handlers.ProductRequest
 		expectCode     int
 		expectedErrors []string
 	}{
 		{
 			name:           "Empty name and price",
-			payload:        handler.ProductRequest{Name: "", Price: 0.0},
+			payload:        handlers.ProductRequest{Name: "", Price: 0.0},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"Name", "Price"},
 		},
 		{
 			name:           "Empty name only",
-			payload:        handler.ProductRequest{Name: "", Price: 100.0},
+			payload:        handlers.ProductRequest{Name: "", Price: 100.0},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"Name"},
 		},
 		{
 			name:           "Invalid price only",
-			payload:        handler.ProductRequest{Name: "Mouse", Price: -5.0},
+			payload:        handlers.ProductRequest{Name: "Mouse", Price: -5.0},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"Price"},
 		},
 		{
 			name:           "Negative quantity",
-			payload:        handler.ProductRequest{Name: "Keyboard", Price: 50.0, Quantity: -1},
+			payload:        handlers.ProductRequest{Name: "Keyboard", Price: 50.0, Quantity: -1},
 			expectCode:     http.StatusBadRequest,
 			expectedErrors: []string{"Quantity"},
 		},
@@ -83,7 +83,7 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 				t.Errorf("expected status %d, got %d", tt.expectCode, w.Code)
 			}
 
-			var resp []handler.ProductValidationError
+			var resp []handlers.ProductValidationError
 			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 				t.Fatalf("error decoding response: %v", err)
 			}
@@ -106,7 +106,7 @@ func TestCreateProductHandler_Invalid(t *testing.T) {
 
 func TestCreateProductHandler_MalformedJSON(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
 	badJSON := `{Name: "Invalid" Price: 100 "}` // missing comma
 	req := httptest.NewRequest(http.MethodPost, "/products", bytes.NewBufferString(badJSON))
@@ -127,17 +127,17 @@ func TestCreateProductHandler_MalformedJSON(t *testing.T) {
 
 func TestGetProductsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
 	// Create the first product
-	product1 := handler.ProductRequest{Name: "Phone", Price: 999.99, Quantity: 1}
+	product1 := handlers.ProductRequest{Name: "Phone", Price: 999.99, Quantity: 1}
 	w1 := createProduct(r, product1)
 	if w1.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created for product creation, got %d", w1.Code)
 	}
 
 	// Create a second product
-	product2 := handler.ProductRequest{Name: "Tablet", Price: 499.99, Quantity: 2}
+	product2 := handlers.ProductRequest{Name: "Tablet", Price: 499.99, Quantity: 2}
 	w2 := createProduct(r, product2)
 
 	if w2.Code != http.StatusCreated {
@@ -152,7 +152,7 @@ func TestGetProductsHandler(t *testing.T) {
 		t.Fatalf("expected 200 OK for product retrieval, got %d", getW.Code)
 	}
 
-	var products []handler.ProductResponse
+	var products []handlers.ProductResponse
 	if err := json.NewDecoder(getW.Body).Decode(&products); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
@@ -188,19 +188,19 @@ func TestGetProductsHandler(t *testing.T) {
 
 func TestUpdateProductHandler_Valid(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
-	product := handler.ProductRequest{Name: "Old Name", Price: 100.0, Quantity: 1}
+	r := router.NewRouter()
+	product := handlers.ProductRequest{Name: "Old Name", Price: 100.0, Quantity: 1}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created, got %d", w.Code)
 	}
 
-	var created handler.ProductResponse
+	var created handlers.ProductResponse
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("error decoding create response: %v", err)
 	}
 
-	updateBody := handler.ProductRequest{Name: "New Name", Price: 200.0, Quantity: 2}
+	updateBody := handlers.ProductRequest{Name: "New Name", Price: 200.0, Quantity: 2}
 	jsonUpdateBody, _ := json.Marshal(updateBody)
 	updateReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", created.Id), bytes.NewReader(jsonUpdateBody))
 	updateReq.Header.Set("Authorization", "Bearer "+token)
@@ -211,7 +211,7 @@ func TestUpdateProductHandler_Valid(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d", updateW.Code)
 	}
 
-	var updated handler.ProductResponse
+	var updated handlers.ProductResponse
 	if err := json.NewDecoder(updateW.Body).Decode(&updated); err != nil {
 		t.Fatalf("error decoding update response: %v", err)
 	}
@@ -228,8 +228,8 @@ func TestUpdateProductHandler_Valid(t *testing.T) {
 }
 
 func TestUpdateProductHandler_NotFound(t *testing.T) {
-	r := api.NewRouter()
-	updateBody := handler.ProductRequest{Name: "Ghost", Price: 1.0}
+	r := router.NewRouter()
+	updateBody := handlers.ProductRequest{Name: "Ghost", Price: 1.0}
 	jsonBody, _ := json.Marshal(updateBody)
 	req := httptest.NewRequest(http.MethodPut, "/products/999999", bytes.NewReader(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -242,7 +242,7 @@ func TestUpdateProductHandler_NotFound(t *testing.T) {
 }
 
 func TestUpdateProductHandler_InvalidInput(t *testing.T) {
-	r := api.NewRouter()
+	r := router.NewRouter()
 	invalidJSON := `{Name: "Bad" Price: 999}` // missing comma
 	req := httptest.NewRequest(http.MethodPut, "/products/1", bytes.NewBufferString(invalidJSON))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -256,20 +256,20 @@ func TestUpdateProductHandler_InvalidInput(t *testing.T) {
 
 func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	product := handler.ProductRequest{Name: "Temporary", Price: 100.0, Quantity: 1}
+	product := handlers.ProductRequest{Name: "Temporary", Price: 100.0, Quantity: 1}
 	w := createProduct(r, product)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created, got %d", w.Code)
 	}
-	var created handler.ProductResponse
+	var created handlers.ProductResponse
 
 	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 	// Try invalid update
-	invalidUpdate := handler.ProductRequest{Name: "", Price: -100, Quantity: -1}
+	invalidUpdate := handlers.ProductRequest{Name: "", Price: -100, Quantity: -1}
 	jsonInvalid, _ := json.Marshal(invalidUpdate)
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/products/%d", created.Id), bytes.NewReader(jsonInvalid))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -280,7 +280,7 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 		t.Errorf("expected 400 Bad Request, got %d", wResult.Code)
 	}
 
-	var resp []handler.ProductValidationError
+	var resp []handlers.ProductValidationError
 	if err := json.NewDecoder(wResult.Body).Decode(&resp); err != nil {
 		t.Fatalf("error decoding response: %v", err)
 	}
@@ -306,9 +306,9 @@ func TestUpdateProductHandler_ValidationErrors(t *testing.T) {
 
 func TestFilterProductsHandler(t *testing.T) {
 	t.Cleanup(clearAllProducts)
-	r := api.NewRouter()
+	r := router.NewRouter()
 
-	products := []handler.ProductRequest{
+	products := []handlers.ProductRequest{
 		{Name: "Phone", Price: 699.99, Quantity: 10},
 		{Name: "Laptop", Price: 1299.99, Quantity: 5},
 		{Name: "Mouse", Price: 29.99, Quantity: 50},
@@ -330,7 +330,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp handler.ProductsSearchResult
+		var resp handlers.ProductsSearchResult
 
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
@@ -348,7 +348,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp handler.ProductsSearchResult
+		var resp handlers.ProductsSearchResult
 
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
@@ -369,7 +369,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp handler.ProductsSearchResult
+		var resp handlers.ProductsSearchResult
 
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
@@ -390,7 +390,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp handler.ProductsSearchResult
+		var resp handlers.ProductsSearchResult
 
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
@@ -408,7 +408,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp handler.ProductsSearchResult
+		var resp handlers.ProductsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}
@@ -425,7 +425,7 @@ func TestFilterProductsHandler(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
-		var resp handler.ProductsSearchResult
+		var resp handlers.ProductsSearchResult
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("error decoding response: %v", err)
 		}

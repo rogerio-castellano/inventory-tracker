@@ -14,8 +14,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/rogerio-castellano/inventory-tracker/internal/db"
-	api "github.com/rogerio-castellano/inventory-tracker/internal/http"
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/handlers"
+	mw "github.com/rogerio-castellano/inventory-tracker/internal/http/middleware"
+	"github.com/rogerio-castellano/inventory-tracker/internal/http/router"
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 	"github.com/rogerio-castellano/inventory-tracker/internal/redissvc"
 	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
@@ -32,7 +33,7 @@ var (
 
 func init() {
 	setupTestRepos("secret")
-	r := api.NewRouter()
+	r := router.NewRouter()
 
 	var err error
 	token, err = generateToken(r, "admin", "secret")
@@ -52,7 +53,7 @@ func setupTestRepos(password string) {
 	}
 	redisService := redissvc.NewRedisService(rdb, ctx)
 	handlers.SetRedisService(redisService)
-	api.SetRedisService(redisService)
+	mw.SetRedisService(redisService)
 
 	dbUrl := os.Getenv("DATABASE_URL")
 	if dbUrl == "" {
