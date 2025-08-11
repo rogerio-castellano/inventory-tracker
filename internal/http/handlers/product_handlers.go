@@ -244,28 +244,6 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func parseFloatPtr(s string) *float64 {
-	if s == "" {
-		return nil
-	}
-	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return nil
-	}
-	return &v
-}
-
-func parseIntPtr(s string) *int {
-	if s == "" {
-		return nil
-	}
-	v, err := strconv.Atoi(s)
-	if err != nil {
-		return nil
-	}
-	return &v
-}
-
 // FilterProductsHandler godoc
 // @Summary Filter and paginate products
 // @Tags products
@@ -329,4 +307,26 @@ func FilterProductsHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("failed to encode response: %v", err)
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
+}
+
+func parseFloatPtr(s string) *float64 {
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return nil
+	}
+	return &v
+}
+
+func parseIntPtr(s string) *int {
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return nil
+	}
+	return &v
 }

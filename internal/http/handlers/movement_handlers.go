@@ -71,41 +71,6 @@ func AdjustQuantityHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func parseID(idStr string) (int, error) {
-	return strconv.Atoi(idStr)
-}
-
-func parseTime(raw string) (*time.Time, error) {
-	if raw == "" {
-		return nil, nil
-	}
-	raw = fixRFC3339(raw)
-	t, err := time.Parse(time.RFC3339, raw)
-	if err != nil {
-		log.Printf("invalid time: %s", raw)
-		return nil, err
-	}
-	return &t, nil
-}
-
-func fixRFC3339(s string) string {
-	if len(s) == len(time.RFC3339) && s[len(s)-6] == ' ' {
-		return s[:len(s)-6] + "+" + s[len(s)-5:]
-	}
-	return s
-}
-
-func parseNonNegativeInt(s string) (*int, error) {
-	if s == "" {
-		return nil, nil
-	}
-	v, err := strconv.Atoi(s)
-	if err != nil || v < 0 {
-		return nil, fmt.Errorf("invalid non-negative int: %s", s)
-	}
-	return &v, nil
-}
-
 // GetMovementsHandler godoc
 // @Summary Get product movement logs
 // @Tags movements
@@ -253,4 +218,39 @@ func ExportMovementsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		csvWriter.Flush()
 	}
+}
+
+func parseID(idStr string) (int, error) {
+	return strconv.Atoi(idStr)
+}
+
+func parseTime(raw string) (*time.Time, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	raw = fixRFC3339(raw)
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		log.Printf("invalid time: %s", raw)
+		return nil, err
+	}
+	return &t, nil
+}
+
+func fixRFC3339(s string) string {
+	if len(s) == len(time.RFC3339) && s[len(s)-6] == ' ' {
+		return s[:len(s)-6] + "+" + s[len(s)-5:]
+	}
+	return s
+}
+
+func parseNonNegativeInt(s string) (*int, error) {
+	if s == "" {
+		return nil, nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 0 {
+		return nil, fmt.Errorf("invalid non-negative int: %s", s)
+	}
+	return &v, nil
 }

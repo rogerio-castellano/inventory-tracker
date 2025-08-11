@@ -14,76 +14,6 @@ import (
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 )
 
-type csvRow struct {
-	Name      string
-	Price     float64
-	Quantity  int
-	Threshold int
-}
-
-func parseCSV(file multipart.File) ([]csvRow, error) {
-	reader := csv.NewReader(file)
-	headers, err := reader.Read()
-	if err != nil {
-		return nil, fmt.Errorf("invalid CSV header")
-	}
-
-	index := map[string]int{}
-	for i, h := range headers {
-		index[strings.ToLower(h)] = i
-	}
-
-	var rows []csvRow
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("CSV read error: %v", err)
-		}
-
-		row := csvRow{
-			Name:      record[index["name"]],
-			Price:     parseFloat(record[index["price"]]),
-			Quantity:  parseInt(record[index["quantity"]]),
-			Threshold: parseInt(record[index["threshold"]]),
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
-}
-
-func validateRow(r csvRow) error {
-	if strings.TrimSpace(r.Name) == "" {
-		return errors.New("missing name")
-	}
-	if r.Price <= 0 {
-		return errors.New("invalid price")
-	}
-	if r.Quantity < 0 {
-		return errors.New("invalid quantity")
-	}
-	if r.Threshold < 0 {
-		return errors.New("invalid threshold")
-	}
-	return nil
-}
-
-func parseFloat(s string) float64 {
-	v, _ := strconv.ParseFloat(s, 64)
-	return v
-}
-
-func parseInt(s string) int {
-	v, _ := strconv.Atoi(s)
-	return v
-}
-
-func nowRFC3339() string {
-	return time.Now().Format(time.RFC3339)
-}
-
 // ImportProductsHandler godoc
 // @Summary Import products via CSV
 // @Tags import
@@ -167,4 +97,74 @@ func ImportProductsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 	}
+}
+
+type csvRow struct {
+	Name      string
+	Price     float64
+	Quantity  int
+	Threshold int
+}
+
+func parseCSV(file multipart.File) ([]csvRow, error) {
+	reader := csv.NewReader(file)
+	headers, err := reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("invalid CSV header")
+	}
+
+	index := map[string]int{}
+	for i, h := range headers {
+		index[strings.ToLower(h)] = i
+	}
+
+	var rows []csvRow
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("CSV read error: %v", err)
+		}
+
+		row := csvRow{
+			Name:      record[index["name"]],
+			Price:     parseFloat(record[index["price"]]),
+			Quantity:  parseInt(record[index["quantity"]]),
+			Threshold: parseInt(record[index["threshold"]]),
+		}
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
+func validateRow(r csvRow) error {
+	if strings.TrimSpace(r.Name) == "" {
+		return errors.New("missing name")
+	}
+	if r.Price <= 0 {
+		return errors.New("invalid price")
+	}
+	if r.Quantity < 0 {
+		return errors.New("invalid quantity")
+	}
+	if r.Threshold < 0 {
+		return errors.New("invalid threshold")
+	}
+	return nil
+}
+
+func parseFloat(s string) float64 {
+	v, _ := strconv.ParseFloat(s, 64)
+	return v
+}
+
+func parseInt(s string) int {
+	v, _ := strconv.Atoi(s)
+	return v
+}
+
+func nowRFC3339() string {
+	return time.Now().Format(time.RFC3339)
 }
