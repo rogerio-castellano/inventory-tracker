@@ -107,7 +107,7 @@ func userRoleToken(r http.Handler) (string, error) {
 	password := "secret-password"
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	user := models.User{
-		Username:     "UserRole",
+		Username:     "TestUserRole",
 		PasswordHash: string(hash),
 	}
 	_, err := userRepo.CreateUser(user)
