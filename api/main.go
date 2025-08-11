@@ -37,6 +37,7 @@ func main() {
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatalf("Could not connect to Redis: %v", err)
 	}
+	defer rdb.Close()
 
 	redisService := redissvc.NewRedisService(rdb, ctx)
 	handlers.SetRedisService(redisService)
@@ -47,6 +48,7 @@ func main() {
 	if err != nil {
 		log.Fatal("❌ Could not connect to database:", err)
 	}
+	defer database.Close()
 
 	handlers.SetProductRepo(repo.NewPostgresProductRepository(database))
 	handlers.SetMovementRepo(repo.NewPostgresMovementRepository(database))
