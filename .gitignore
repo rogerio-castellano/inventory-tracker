@@ -42,3 +42,5 @@ bin/
 .env
 .env.*
 zzz-ignore/
+mailhogdata/
+internal/tests/handlers_integrated_test_suite/refresh_tokens.json
