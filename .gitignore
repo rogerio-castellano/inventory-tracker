@@ -1,42 +1,47 @@
-# Go build artifacts
+# 🧱 Go build artifacts
 /inventory-api
 *.exe
 *.out
 *.test
 
-# Vendor directory (if using go mod vendor)
+# 📦 Vendor directory (if using go mod vendor)
 vendor/
 
-# IDE/editor folders
+# 🧠 IDE/editor folders
 .vscode/
 .idea/
 *.sw?
 
-# OS junk
+# 🖥️ OS-generated files
 .DS_Store
 Thumbs.db
 
-# Logs
+# 📄 Logs
 *.log
+**/*.log  # Catch logs in subdirectories
 
-# Dependency cache
-/go.sum
-/go.mod
-
-# Docker
+# 🐳 Docker-related files
 **/pgdata/
 *.env
+.env.*
+docker-compose.override.yml
 
-# Swagger generated docs
+# 📚 Swagger generated docs
 /docs/docs.go
 /docs/swagger.json
 /docs/swagger.yaml
 
-# Test output
+# 🧪 Test output
 coverage.out
+**/coverage.out
+**/testdata/
 
-# Git-ignored Makefile-generated binaries
+# 🔧 Makefile-generated binaries
 bin/
+
+# 🧹 Misc cleanup
+go.sum.old
+
 
 # Prevent committing sensitive config
 .env
