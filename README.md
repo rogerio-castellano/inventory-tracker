@@ -14,24 +14,32 @@ A full-featured backend service for managing products, stock levels, movement lo
 - 📥 Batch CSV import (with update/skip modes)
 - 📤 Movement export (CSV/JSON)
 - 🧑 User auth with JWT
-- 🔐 Role-ready architecture
+- 🔐 Role-Based Access Control (RBAC) with roles & permissions
+- 🚦 API rate limiting using Redis-based token bucket with per-user and role-specific quotas
+- 🛡️ Ban & session revocation stored in Redis with TTL
 - 📘 OpenAPI docs (`/swagger`)
+- 📊 Prometheus `/metrics` endpoint for monitoring (**planned**)
+- 🛡️ Ban & session revocation system
+- 📧 Email alerts via SMTP
 - 🧪 Full test coverage
 
 ---
 
 ## 🛠 Tech Stack
 
-| Layer      | Tech                                                      |
-| ---------- | --------------------------------------------------------- |
-| Language   | Go 1.24.4                                                 |
-| Router     | [Chi](https://github.com/go-chi/chi)                      |
-| Database   | PostgreSQL                                                |
-| Migrations | [Soda](https://gobuffalo.io/documentation/database/soda/) |
-| Docs       | [Swaggo](https://github.com/swaggo/swag)                  |
-| Auth       | JWT                                                       |
-| Container  | Docker, Docker Compose                                    |
-| Tests      | `go test`, Dockerized                                     |
+| Layer         | Tech                                                      |
+| ------------- | --------------------------------------------------------- |
+| Language      | Go 1.24.4                                                 |
+| Router        | [Chi](https://github.com/go-chi/chi)                      |
+| Database      | PostgreSQL                                                |
+| Migrations    | [Soda](https://gobuffalo.io/documentation/database/soda/) |
+| Docs          | [Swaggo](https://github.com/swaggo/swag)                  |
+| Auth          | JWT                                                       |
+| RBAC          | File-based roles & permissions                            |
+| Rate Limiting | Redis-backed token bucket with role-based quotas          |
+| Monitoring    | Prometheus + Grafana                                      |
+| Container     | Docker, Docker Compose                                    |
+| Tests         | `go test`, Dockerized                                     |
 
 ---
 
