@@ -24,7 +24,7 @@ func (r *PostgresMovementRepository) Log(productID, delta int) error {
 	defer cancel()
 
 	_, err := r.db.ExecContext(ctx, query, productID, delta, time.Now().UTC(), time.Now().UTC())
-	return err
+	return fmt.Errorf("failed to insert movement: %w", err)
 }
 
 const defaultLimit = 100

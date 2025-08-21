@@ -231,14 +231,14 @@ func recordRateLimitStrike(key, route string, r *http.Request) error {
 		if strikes >= int64(rateLimitStrikeThreshold) {
 			key, err := getClientIdentifier(r)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get client identifier: %w", err)
 			}
 
 			banKey := fmt.Sprintf("ratelimit:ban:%s", key)
 			_ = rdb.Set(ctx, banKey, "1", banDuration).Err()
 			log.Printf("🚫 BANNED: %s for %v due to %d+ strikes", banKey, banDuration, strikes)
 			if err := ban.SendBanAlertEmail(key, route, int(strikes), r); err != nil { // 📨 trigger alert
-				return err
+				return fmt.Errorf("failed to send ban alert email: %w", err)
 			}
 		}
 	}

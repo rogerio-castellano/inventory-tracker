@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -31,7 +32,7 @@ func readJSON(w http.ResponseWriter, r *http.Request, data any) error {
 	dec := json.NewDecoder(r.Body)
 	err := dec.Decode(data)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read JSON: %w", err)
 	}
 
 	err = dec.Decode(&struct{}{})
@@ -46,7 +47,7 @@ func readJSON(w http.ResponseWriter, r *http.Request, data any) error {
 func writeJSON(w http.ResponseWriter, status int, data any, headers ...http.Header) error {
 	out, err := json.Marshal(data)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read JSON: %w", err)
 	}
 
 	if len(headers) > 0 {
@@ -59,7 +60,7 @@ func writeJSON(w http.ResponseWriter, status int, data any, headers ...http.Head
 	w.WriteHeader(status)
 	_, err = w.Write(out)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write to response: %w", err)
 	}
 
 	return nil

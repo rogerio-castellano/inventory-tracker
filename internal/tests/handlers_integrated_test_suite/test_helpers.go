@@ -85,7 +85,7 @@ func setupTestRepos(password string) {
 func createAdminIfNotExists(password string) error {
 	exists, err := userExists("admin")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to verify if user exists: %w", err)
 	}
 
 	if !exists {
@@ -97,7 +97,7 @@ func createAdminIfNotExists(password string) error {
 		})
 
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create user admin: %w", err)
 		}
 	}
 

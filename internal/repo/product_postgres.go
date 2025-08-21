@@ -92,7 +92,7 @@ func (r *PostgresProductRepository) Delete(id int) error {
 
 	res, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete product: %w", err)
 	}
 	rowsAffected, _ := res.RowsAffected()
 	if rowsAffected == 0 {

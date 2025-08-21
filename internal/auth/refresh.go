@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -101,7 +102,7 @@ func loadRefreshTokens() error {
 			tokenStore = make(map[string]map[string]RefreshTokenEntry)
 			return nil
 		}
-		return err
+		return fmt.Errorf("failed to load refresh token: %w", err)
 	}
 	return json.Unmarshal(data, &tokenStore)
 }
@@ -109,7 +110,7 @@ func loadRefreshTokens() error {
 func saveRefreshTokens() error {
 	data, err := json.MarshalIndent(tokenStore, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to save refresh token: %w", err)
 	}
 	return os.WriteFile(refreshTokenFile, data, 0600)
 }
