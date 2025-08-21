@@ -2,7 +2,8 @@ FROM alpine:3.22
 
 WORKDIR /app
 COPY inventory-api .
+COPY /config/config.yaml /config/config.yaml
 RUN chmod +x inventory-api
-
+ENV CONFIG_PATH=/config
 EXPOSE 8080
 ENTRYPOINT ["./inventory-api"]

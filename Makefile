@@ -17,11 +17,11 @@ build-go:
 	echo "$$((end - start)) seconds to build"
 
 test: ## Run all tests
-	go test ./...
+	DATABASE_URL=postgres://postgres:example@localhost:5432/inventory?sslmode=disable go test ./...
 
 t:dev-test
 dev-test: ## Run unit tests
-	go test ./internal/tests/handlers_integrated_test_suite
+	DATABASE_URL=postgres://postgres:example@localhost:5432/inventory?sslmode=disable go test ./internal/tests/handlers_integrated_test_suite
 
 lint:
 	golangci-lint run

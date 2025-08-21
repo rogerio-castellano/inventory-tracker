@@ -57,7 +57,7 @@ func setupTestRepos(password string) {
 
 	dbUrl := os.Getenv("DATABASE_URL")
 	if dbUrl == "" {
-		os.Setenv("DATABASE_URL", "postgres://postgres:example@localhost:5432/inventory?sslmode=disable")
+		log.Fatal("Environment variable DATABASE_URL not found.")
 	}
 	var err error
 	database, err = db.Connect()

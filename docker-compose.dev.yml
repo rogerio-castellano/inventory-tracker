@@ -2,7 +2,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.env
+      dockerfile: Dockerfile.dev
     container_name: inventory-api
     ports:
       - "8080:8080"

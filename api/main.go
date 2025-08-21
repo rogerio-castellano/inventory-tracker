@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -16,6 +17,7 @@ import (
 	"github.com/rogerio-castellano/inventory-tracker/internal/http/router"
 	"github.com/rogerio-castellano/inventory-tracker/internal/redissvc"
 	"github.com/rogerio-castellano/inventory-tracker/internal/repo"
+	"github.com/spf13/viper"
 )
 
 var rdb = redis.NewClient(&redis.Options{
@@ -56,6 +58,20 @@ func main() {
 	handlers.SetMovementRepo(repo.NewPostgresMovementRepository(database))
 	handlers.SetUserRepo(repo.NewPostgresUserRepository(database))
 	handlers.SetMetricsRepo(repo.NewPostgresMetricsRepository(database))
+
+	viper.SetConfigName("config") // no extension
+	viper.SetConfigType("yaml")
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		configPath = "." // default
+	}
+	viper.AddConfigPath(configPath)
+	err = viper.ReadInConfig()
+	if err != nil {
+		log.Fatalf("Error reading config file: %v", err)
+	}
+	viper.AutomaticEnv()
+	auth.SetSecret(viper.GetString("JWT_SECRET"))
 
 	r := router.NewRouter()
 	log.Println("✅ Server running on :8080")

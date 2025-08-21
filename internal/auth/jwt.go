@@ -8,7 +8,11 @@ import (
 	"github.com/rogerio-castellano/inventory-tracker/internal/models"
 )
 
-var jwtSecret = []byte("super-secret-key") // move to env in prod
+var jwtSecret []byte
+
+func SetSecret(secret string) {
+	jwtSecret = []byte(secret)
+}
 
 func GenerateToken(user models.User) (string, error) {
 	return buildTokenWithClaims(user, "")
@@ -21,7 +25,7 @@ func GenerateImpersonationToken(user models.User, impersonator string) (string, 
 func TokenClaims(auth string) (*jwt.Token, jwt.MapClaims, error) {
 	tokenStr := strings.TrimPrefix(auth, "Bearer ")
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-		return []byte("super-secret-key"), nil
+		return jwtSecret, nil
 	})
 
 	if err != nil || !token.Valid {
